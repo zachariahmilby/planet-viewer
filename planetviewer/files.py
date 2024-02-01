@@ -363,8 +363,16 @@ _jwst_kernels = [
             remote_path='JWST/kernels/spk/'),
 ]
 
+"""HST position kernels."""
+_hst_kernels = [
+    _Kernel('hst.bsp', kernel_type='spk',
+            description='HST ephemeris up to 1 month in the future.',
+            remote_path='HST/kernels/spk/'),
+]
+
 """Dictionary of all SPICE kernels."""
 _all_kernels = {
     'generic': _all_generic_kernels,
-    'JWST': _jwst_kernels
+    'JWST': _jwst_kernels,
+    'HST': _hst_kernels
 }
