@@ -280,6 +280,9 @@ _generic_kernels = [
             description='Mass parameters for planets, natural satellites, '
                         'and other major objects.',
             remote_path='generic_kernels/pck/'),
+    _Kernel('pck00010.tpc', kernel_type='pck',
+            description='Orientation and size/shape data for natural bodies.',
+            remote_path='generic_kernels/pck/'),
     _Kernel('pck00011.tpc', kernel_type='pck',
             description='Orientation and size/shape data for natural bodies.',
             remote_path='generic_kernels/pck/'),
