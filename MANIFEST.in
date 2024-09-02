@@ -1,0 +1,2 @@
+include planetviewer/anc/*
+exclude planetviewer/anc/kernels
