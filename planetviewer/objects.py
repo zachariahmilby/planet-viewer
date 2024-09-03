@@ -901,7 +901,7 @@ class Ring:
         return self._arcs
 
 
-class SolarSystemObject:
+class SolarSystemBody:
     """
     A Solar System object like a major planet, a minor planet or a satellite.
     """
