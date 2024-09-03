@@ -21,7 +21,7 @@ pck_kernel = 'pck00010.tpc'
 changes to longitudes on Mars and Neptune."""
 
 
-class SPICEKernel:
+class _SPICEKernel:
     """
     Class to hold information about a SPICE kernel and provide the option to
     download a local copy.
@@ -183,7 +183,7 @@ class SPICEKernel:
             return None
 
 
-class EarthObservatory:
+class _EarthObservatory:
     """
     Define an observatory on the surface of the Earth, specified by a
     name or a set of latitude, longitude and altitude coordinates.
@@ -279,7 +279,7 @@ class EarthObservatory:
             os.remove(in_file)
         return out_file
 
-    def make_kernel(self, overwrite: bool = False) -> [SPICEKernel]:
+    def make_kernel(self, overwrite: bool = False) -> [_SPICEKernel]:
         """
         Generate a SPICEKernel object for this observatory's SPK kernel.
 
@@ -292,19 +292,19 @@ class EarthObservatory:
 
         Returns
         -------
-        list[SPICEKernel]
+        list[_SPICEKernel]
             A list containing the SPK kernel for this observatory.
         """
         path = self._make_spk_kernel(overwrite=overwrite)
-        kernel = SPICEKernel(name=f'{self._name.lower()}.bsp',
-                             location=str(path.parent), remote=False)
+        kernel = _SPICEKernel(name=f'{self._name.lower()}.bsp',
+                              location=str(path.parent), remote=False)
         code = 399000 + self._code
         spiceypy.boddef(self._name, code)
         return [kernel]
 
 
 def _earth_obs_kernel_from_name(name: str,
-                                code: int) -> list[SPICEKernel]:
+                                code: int) -> list[_SPICEKernel]:
     """
     Automatically generate an observing site kernel using coordinates from
     Astropy.
@@ -319,11 +319,11 @@ def _earth_obs_kernel_from_name(name: str,
 
     Returns
     -------
-    list[SPICEKernel]
+    list[_SPICEKernel]
         A list containing the SPK kernel for this observatory.
     """
     location = EarthLocation.of_site(name)
-    observatory = EarthObservatory(
+    observatory = _EarthObservatory(
         name=name, latitude=location.lat, longitude=location.lon,
         altitude=location.height, code=code)
     kernel = observatory.make_kernel()
@@ -336,7 +336,7 @@ def _earth_obs_kernel_from_coords(name: str,
                                   longitude: Longitude,
                                   altitude: u.Quantity,
                                   overwrite: bool = False
-                                  ) -> list[SPICEKernel]:
+                                  ) -> list[_SPICEKernel]:
     """
     Generate an observing site kernel using user-specified coordinates.
 
@@ -359,10 +359,10 @@ def _earth_obs_kernel_from_coords(name: str,
 
     Returns
     -------
-    list[SPICEKernel]
+    list[_SPICEKernel]
         A list containing the SPK kernel for this observatory.
     """
-    observatory = EarthObservatory(
+    observatory = _EarthObservatory(
         name=name, latitude=latitude, longitude=longitude, altitude=altitude,
         code=code)
     kernel = observatory.make_kernel(overwrite=overwrite)
@@ -370,27 +370,27 @@ def _earth_obs_kernel_from_coords(name: str,
 
 
 def _get_outer_planet_kernels(
-        satellite_kernels: list[str]) -> list[SPICEKernel]:
+        satellite_kernels: list[str]) -> list[_SPICEKernel]:
     """
     Generate a set of SPICE kernels for Mars, Jupiter, Saturn, Uranus, Neptune
     or Pluto with appropriate local paths.
 
     Returns
     -------
-    list[SPICEKernel]
+    list[_SPICEKernel]
         A list of SPICEKernel objects for Mars, Jupiter, Saturn, Uranus,
         Neptune or Pluto.
     """
     kernels = []
     for satellite_kernel in satellite_kernels:
-        kernel = SPICEKernel(
+        kernel = _SPICEKernel(
             name=satellite_kernel, location='generic_kernels/spk/satellites/')
         kernels.append(kernel)
     return kernels
 
 
 def _get_spacecraft_kernels(kernel_names: list[str],
-                            location: str) -> list[SPICEKernel]:
+                            location: str) -> list[_SPICEKernel]:
     """
     Get a list of SPICE kernels for a spacecraft.
 
@@ -404,23 +404,23 @@ def _get_spacecraft_kernels(kernel_names: list[str],
 
     Returns
     -------
-    list[SPICEKernel]
+    list[_SPICEKernel]
         A list of SPICEKernel objects for the spacecraft.
     """
     kernels = []
     for kernel in kernel_names:
-        kernels.append(SPICEKernel(name=kernel, location=location))
+        kernels.append(_SPICEKernel(name=kernel, location=location))
     return kernels
 
 
 common_kernels = [
-    SPICEKernel(name=pck_kernel, location='generic_kernels/pck/'),
-    SPICEKernel(name='gm_de440.tpc', location='generic_kernels/pck/'),
-    SPICEKernel(name='naif0012.tls', location='generic_kernels/lsk/'),
-    SPICEKernel(name='de440.bsp', location='generic_kernels/spk/planets/')]
+    _SPICEKernel(name=pck_kernel, location='generic_kernels/pck/'),
+    _SPICEKernel(name='gm_de440.tpc', location='generic_kernels/pck/'),
+    _SPICEKernel(name='naif0012.tls', location='generic_kernels/lsk/'),
+    _SPICEKernel(name='de440.bsp', location='generic_kernels/spk/planets/')]
 
 
-def _get_uncommon_kernels() -> tuple[dict[str, list[SPICEKernel]],
+def _get_uncommon_kernels() -> tuple[dict[str, list[_SPICEKernel]],
                                      list[str], list[str]]:
     """
     Get a dictionary of all the other kernels aside from the common kernels.
