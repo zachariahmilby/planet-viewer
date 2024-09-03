@@ -1008,7 +1008,7 @@ class Planet:
                                   time: Time,
                                   observer: str) -> Latitude:
         """
-        Get sub-observer geodetic latitude for a given UTC time and
+        Get sub-observer planetographic latitude for a given UTC time and
         observer/observatory.
 
         Parameters
@@ -1022,7 +1022,8 @@ class Planet:
 
         Returns
         -------
-        The sub-observer geodetic latitude as an Astropy `Latitude` object.
+        The sub-observer planetographic latitude as an Astropy `Latitude`
+        object.
         """
         et = get_et(time)
         lat, _ = get_sub_observer_latlon(self._name, et, observer)
@@ -1032,7 +1033,7 @@ class Planet:
                                    time: Time,
                                    observer: str) -> Longitude:
         """
-        Get sub-observer geodetic longitude for a given UTC time and
+        Get sub-observer planetographic longitude for a given UTC time and
         observer/observatory.
 
         Parameters
@@ -1046,7 +1047,8 @@ class Planet:
 
         Returns
         -------
-        The sub-observer geodetic latitude as an Astropy `Longitude` object.
+        The sub-observer planetographic latitude as an Astropy `Longitude`
+        object.
         """
         et = get_et(time)
         _, lon = get_sub_observer_latlon(self._name, et, observer)
@@ -1056,7 +1058,7 @@ class Planet:
                               time: Time,
                               observer: str) -> Latitude:
         """
-        Get sub-solar geodetic latitude for a given UTC time and
+        Get sub-solar planetographic latitude for a given UTC time and
         observer/observatory.
 
         Parameters
@@ -1070,7 +1072,8 @@ class Planet:
 
         Returns
         -------
-        The sub-observer geodetic latitude as an Astropy `Latitude` object.
+        The sub-observer planetographic latitude as an Astropy `Latitude`
+        object.
         """
         et = get_et(time)
         lat, _ = get_sub_solar_latlon(self._name, et, observer)
@@ -1080,7 +1083,7 @@ class Planet:
                                time: Time,
                                observer: str) -> Longitude:
         """
-        Get sub-solar geodetic longitude for a given UTC time and
+        Get sub-solar planetographic longitude for a given UTC time and
         observer/observatory.
 
         Parameters
@@ -1094,7 +1097,8 @@ class Planet:
 
         Returns
         -------
-        The sub-observer geodetic latitude as an Astropy `Longitude` object.
+        The sub-observer planetographic latitude as an Astropy `Longitude`
+        object.
         """
         et = get_et(time)
         _, lon = get_sub_solar_latlon(self._name, et, observer)
@@ -1277,8 +1281,9 @@ class Planet:
     def get_ascending_node_longitude(self,
                                      time: Time) -> Longitude:
         """
-        Get geodetic longitude of the ring plane ascending node (by definition,
-        the ascending node of the primary body's equator on the J2000 equator).
+        Get planetographic longitude of the ring plane ascending node (by
+        definition, the ascending node of the primary body's equator on the
+        J2000 equator).
 
         Parameters
         ----------
@@ -1287,8 +1292,8 @@ class Planet:
 
         Returns
         -------
-        The geodetic longitude of the ring plane ascending node as an Astropy
-        `Longitude` object.
+        The planetographic longitude of the ring plane ascending node as an
+        Astropy `Longitude` object.
         """
         et = get_et(time)
         ra, _, _, _ = spiceypy.bodeul(self._code, et)
@@ -1311,8 +1316,8 @@ class Planet:
                                 observer: str,
                                 desc: str) -> Longitude:
         """
-        Calculate the sub-solar or sub-observer geodetic longitude relative to
-        the ring plane ascending node.
+        Calculate the sub-solar or sub-observer planetographic longitude
+        relative to the ring plane ascending node.
 
         Parameters
         ----------
@@ -1328,17 +1333,16 @@ class Planet:
 
         Returns
         -------
-        The sub-solar or sub-observer longitude geodetic longitude relative to
-        the ring plane ascending node as an Astropy `Longitude` object.
+        The sub-solar or sub-observer longitude planetographic longitude
+        relative to the ring plane ascending node as an Astropy `Longitude`
+        object.
         """
         ascnode = self.get_ascending_node_longitude(time)
         if desc == 'solar':
             sublon = self.get_subsolar_longitude(time, observer)
         else:
             sublon = self.get_sub_observer_longitude(time, observer)
-        longitude = sublon - ascnode
-        if longitude < 0 * u.degree:
-            longitude += 360 * u.degree
+        longitude = (sublon - ascnode) % 360 * u.degree
         return Longitude(longitude).to(u.degree)
 
     def get_ring_subsolar_longitude(self,

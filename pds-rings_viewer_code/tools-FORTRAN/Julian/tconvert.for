@@ -27,7 +27,7 @@ c       (TAI, seconds relative to J2000), Ephemeris time (ET, seconds relative
 c       to J2000 TAI), Julian date, and Modified Julian date.
 c
 c       For further information on the acceptable formats of the input string,
-c       see the documentation file "parsing.txt".
+c       see the docs file "parsing.txt".
 c$ External_references:
 c       FJul_ParseDT(), FJul_FormatPDS(), FJul_FormatSQL(), FJul_TAIofDUTC(),
 c       FJul_ETofTAI(), FJul_JDofTAI(), FJul_JDofTAI(), FJul_JDofTAI(),
@@ -79,7 +79,7 @@ c       Mark R. Showalter
 c       PDS Rings Node
 c       NASA/Ames Research Center
 c$ Version_and_date:
-c       1.3: June 1998 improved documentation.
+c       1.3: June 1998 improved docs.
 c$ Change_history:
 c       1.0: December 1995
 c******************************************************************************/

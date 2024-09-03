@@ -46,12 +46,12 @@ C     L          O   See ESMAP2.
 C
 C$ Detailed_Input
 C
-C     Inputs are described in detail in the documentation for
+C     Inputs are described in detail in the docs for
 C     the individual entry points, ESMAP1 and ESMAP2.
 C
 C$ Detailed_Output
 C
-C     Outputs are described in detail in the documentation for
+C     Outputs are described in detail in the docs for
 C     the individual entry point ESMAP2.
 C
 C$ Input_Files

@@ -479,6 +479,7 @@ def plot_primary_shadow(axis: WCSAxes,
                    **kwargs)
 
 
+# TODO: add examples in each of these docstrings.
 # noinspection DuplicatedCode
 def plot_latlon(axis: WCSAxes,
                 coords: list[SkyCoord],
@@ -925,8 +926,8 @@ def place_label(axis: WCSAxes,
         want it directly in the center, use a single 'center' instead of
         'center center'.
     coord : SkyCoord
-        The coordinates of the ring arc. Can be generated with the `Ring`
-        method `get_arc_sky_coordinates`.
+        The coordinates of the body being labelled. Can be generated with the
+        `Planet` method `get_skycoord`.
     body_radius : Angle
         The angular radius of the object.
     dra : Angle
