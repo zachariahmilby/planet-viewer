@@ -152,7 +152,7 @@ these for you (see below).
 Ths visualization methods will also incorporate any changes you make to 
 Matplotlib's runtime configuration (rcParams), so you can style the graphics 
 however you'd like.
-> **CAUTION**
+> **CAUTION**<br>
 > There is a [known bug](https://github.com/astropy/astropy/issues/15344) 
 > between Astropy's extensions to Matpltolib and pgf rendering. This will cause 
 > an exception if you try to use pgf. Hopefully this will be fixed soon.
