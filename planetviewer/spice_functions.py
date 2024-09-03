@@ -4,14 +4,14 @@ import spiceypy
 from astropy.time import Time
 from spiceypy.utils.exceptions import NotFoundError
 
-"""Set fundamental SPICE units for length, time and angle."""
+# Set fundamental SPICE units for length, time and angle.
 length_unit = u.km
 time_unit = u.s
 angle_unit = u.rad
 angle_rate_unit = u.degree / u.day
 
 
-"""Set common SPICE parameters"""
+# Set common SPICE parameters
 abcorr = 'LT+S'
 ref = 'J2000'
 subpoint_method = 'ELLIPSOID'
@@ -28,13 +28,14 @@ def get_et(time: Time) -> float:
     Convert Astropy time object to SPICE ephemeris time.
 
     Parameters
-    ----------d
+    ----------
     time : Time
         The time to convert.
 
     Returns
     -------
-    The equivalent ephemeris time.
+    float
+        The equivalent ephemeris time.
     """
     time_str = time.isot.replace('T', ' ')
     return spiceypy.str2et(time_str)
@@ -52,7 +53,9 @@ def determine_prograde_rotation(target: str) -> bool:
 
     Returns
     -------
-    A bool indicating whether or not the body's rotation is prograde or not.
+    bool
+        A bool indicating whether or not the body's rotation is prograde or
+        not.
     """
     code = spiceypy.bodn2c(target)
     pm = spiceypy.bodvcd(code, 'PM', 3)[1]
@@ -68,7 +71,8 @@ def get_rotation_rate(target: str) -> float:
 
     Returns
     -------
-    Parent body angular rotation rate in units of [deg/day].
+    float
+        Parent body angular rotation rate in units of [deg/day].
     """
     code = spiceypy.bodn2c(target)
     rate = spiceypy.bodvcd(code, 'PM', 3)[1][1] * angle_rate_unit
@@ -86,7 +90,8 @@ def get_radii(target: str) -> np.ndarray:
 
     Returns
     -------
-    An array of the triaxial ellipsoid axes in [km].
+    np.ndarray
+        An array of the triaxial ellipsoid axes in [km].
     """
     code = spiceypy.bodn2c(target)
     _, radii = spiceypy.bodvcd(code, 'RADII', 3)
@@ -108,7 +113,8 @@ def get_equatorial_radius(target: str, lon: float) -> float:
 
     Returns
     -------
-    An array of the triaxial ellipsoid axes in [km].
+    float
+        An array of the triaxial ellipsoid axes in [km].
     """
     radii = get_radii(target)
     re = np.sqrt(
@@ -129,7 +135,8 @@ def get_flattening_coefficient(target: str, lon: float) -> float:
 
     Returns
     -------
-    The flattening coefficient (0 = spherical, 1 = pancake).
+    float
+        The flattening coefficient (0 = spherical, 1 = pancake).
     """
     rp = get_radii(target)[2]
     re = get_equatorial_radius(target, lon)
@@ -154,7 +161,8 @@ def get_sky_coordinates(target: str,
 
     Returns
     -------
-    The object RA and Dec in [rad].
+    tuple[float, float]
+        The object RA and Dec in [rad].
     """
     ptarg, _ = spiceypy.spkpos(target, et, ref, abcorr, obs)
     _, ra, dec = spiceypy.recrad(ptarg)
@@ -179,7 +187,8 @@ def get_light_time(target: str,
 
     Returns
     -------
-    The light travel time in [s].
+    float
+        The light travel time in [s].
     """
     _, lt = spiceypy.spkpos(target, et, ref, abcorr, obs)
     return lt
@@ -196,7 +205,8 @@ def _get_target_frame(target: str) -> str:
 
     Returns
     -------
-    The IAU frame name as a string.
+    str
+        The IAU frame name as a string.
     """
     return f'IAU_{target}'
 
@@ -236,8 +246,9 @@ def _get_sub_latlon(target: str,
 
     Returns
     -------
-    The sub-observer or sub-solar latitude and longitude on the target body in
-    [rad].
+    tuple[float, float]
+        The sub-observer or sub-solar latitude and longitude on the target body
+        in [rad].
     """
     spoint, _, _ = _get_subpnt(target, et, obs, desc)
     lon = np.arctan2(spoint[1], spoint[0])
@@ -268,8 +279,9 @@ def _get_sub_distance(target: str,
 
     Returns
     -------
-    The distance to the sub-observer point or sub-solar point on target body in 
-    [km].
+    float
+        The distance to the sub-observer point or sub-solar point on target
+        body in [km].
     """
     _, _, srfvec = _get_subpnt(target, et, obs, desc)
     return spiceypy.vnorm(srfvec)
@@ -292,7 +304,8 @@ def get_sub_observer_latlon(target: str,
 
     Returns
     -------
-    The sub-solar latitude and longitude on the target body in [rad].
+    tuple[float, float]
+        The sub-solar latitude and longitude on the target body in [rad].
     """
     return _get_sub_latlon(target, et, obs, 'observer')
 
@@ -314,8 +327,9 @@ def get_sub_observer_distance(target: str,
 
     Returns
     -------
-    The distance between the observer and the sub-observer point on the target
-    body's surface in [km].
+    float
+        The distance between the observer and the sub-observer point on the
+        target body's surface in [km].
     """
     return _get_sub_distance(target, et, obs, 'observer')
 
@@ -337,8 +351,9 @@ def get_sub_observer_epoch(target: str,
 
     Returns
     -------
-    The apparent time at the sub-observer point (effectively the epoch with the
-    light travel time to the sub-observer point subtracted).
+    float
+        The apparent time at the sub-observer point (effectively the epoch with
+        the light travel time to the sub-observer point subtracted).
     """
     _, trgepc, _ = _get_subpnt(target, et, obs, 'observer')
     return trgepc
@@ -361,7 +376,8 @@ def get_sub_observer_phase_angle(target: str,
 
     Returns
     -------
-    The phase angle at the sub-observer point in [rad].
+    float
+        The phase angle at the sub-observer point in [rad].
     """
     spoint, _, _ = _get_subpnt(target, et, obs, 'observer')
     _, _, phase, _, _ = spiceypy.ilumin(
@@ -387,7 +403,8 @@ def get_sub_solar_latlon(target: str,
 
     Returns
     -------
-    The sub-solar latitude and longitude on the target body in [rad].
+    tuple[float, float]
+        The sub-solar latitude and longitude on the target body in [rad].
     """
     return _get_sub_latlon(target, et, obs, 'solar')
 
@@ -409,8 +426,9 @@ def get_sub_solar_distance(target: str,
 
     Returns
     -------
-    The distance between the solar and the sub-solar point on the target
-    body's surface in [km].
+    float
+        The distance between the solar and the sub-solar point on the target
+        body's surface in [km].
     """
     return _get_sub_distance(target, et, obs, 'solar')
 
@@ -429,8 +447,9 @@ def get_anti_solar_radec(et: float,
 
     Returns
     -------
-    The distance between the solar and the sub-solar point on the target
-    body's surface in [km].
+    tuple[float, float]
+        The distance between the solar and the sub-solar point on the target
+        body's surface in [km].
     """
     ra, dec = get_sky_coordinates('Sun', et, obs)
     ra = (ra + spiceypy.pi()) % spiceypy.twopi()
@@ -455,10 +474,11 @@ def get_state(target: str,
 
     Returns
     -------
-    The state of the body in the J2000 reference frame. The first three indices
-    of the array are the (x, y, z) position vector components in [km], and the
-    second three indices of the array are the (dx/dt, dy/dt, dz/dt) velocity
-    vector components in [km/s].
+    np.ndarray
+        The state of the body in the J2000 reference frame. The first three
+        indices of the array are the (x, y, z) position vector components in
+        [km], and the second three indices of the array are the (dx/dt, dy/dt,
+        dz/dt) velocity vector components in [km/s].
     """
     starg, _ = spiceypy.spkezr(target, et, ref, abcorr, obs)
     return starg
@@ -485,8 +505,9 @@ def get_limb_radec(target: str,
 
     Returns
     -------
-    The right ascension and declination of the target body's apparent limb in
-    units of [rad].
+    tuple[np.ndarray, np.ndarray]
+        The right ascension and declination of the target body's apparent limb
+        in units of [rad].
     """
     fixref = _get_target_frame(target)
     params = dict(method='TANGENT/ELLIPSOID',
@@ -538,8 +559,9 @@ def get_terminator_radec(target: str,
 
     Returns
     -------
-    The right ascension and declination of the target body's terminator in
-    units of [rad].
+    tuple[np.ndarray, np.ndarray]
+        The right ascension and declination of the target body's terminator in
+        units of [rad].
     """
     fixref = _get_target_frame(target)
     termpt_params = dict(method=f'{kind.upper()}/TANGENT/ELLIPSOID',
@@ -614,8 +636,10 @@ def get_latlon_radec(target: str,
 
     Returns
     -------
-    The right ascension and declination of the latitude/longitude pair. Returns
-    NaN if the point is not visible to the observer at the specified time.
+    tuple[float, float]
+        The right ascension and declination of the latitude/longitude pair.
+        Returns NaN if the point is not visible to the observer at the
+        specified time.
     """
     params = dict(method=subpoint_method,
                   target=target,
@@ -670,7 +694,8 @@ def determine_occultation(target1: str,
 
     Returns
     -------
-    The occultation identification code.
+    int
+        The occultation identification code.
     """
     params = dict(target1=target1,
                   shape1='ELLIPSOID',
@@ -712,7 +737,8 @@ def determine_eclipse_or_transit(target1: str,
 
     Returns
     -------
-    The occultation code.
+    int
+        The occultation code.
     """
     # get apparent ephemeris times at target and Sun as viewed from target
     code = spiceypy.bods2c(obs)
@@ -749,8 +775,9 @@ def get_dayside_radec(target: str,
 
     Returns
     -------
-    The right ascension and declination of the target body's apparent dayside
-    disk in units of [rad].
+    tuple[np.ndarray, np.ndarray]
+        The right ascension and declination of the target body's apparent
+        dayside disk in units of [rad].
     """
     fixref = _get_target_frame(target)
     params = dict(method='TANGENT/ELLIPSOID',
@@ -833,8 +860,9 @@ def get_shadow_intercept(target1: str,
 
     Returns
     -------
-    The right ascension and declination of the `target2`'s shadow on the disk
-    of `target1` in units of [rad].
+    tuple[np.ndarray, np.ndarray]
+        The right ascension and declination of the `target2`'s shadow on the
+        disk of `target1` in units of [rad].
     """
 
     # get fixed reference frames and target1 radii

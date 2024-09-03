@@ -10,15 +10,15 @@ import spiceypy
 from astropy.coordinates import EarthLocation, Latitude, Longitude
 from tqdm import tqdm
 
-from planetviewer.files import kernel_path
 from planetviewer.files import _project_directory
+from planetviewer.files import kernel_path
 
-"""NAIF remote server kernel directories."""
 naif_url = 'https://naif.jpl.nasa.gov/pub/naif/'
+"""NAIF remote server kernel directories."""
 
+pck_kernel = 'pck00010.tpc'
 """Set planetary constants kernel; the new pck00011.tpc makes some major 
 changes to longitudes on Mars and Neptune."""
-pck_kernel = 'pck00010.tpc'
 
 
 class SPICEKernel:
@@ -64,7 +64,8 @@ class SPICEKernel:
 
         Returns
         -------
-        The url or None, as appropriate.
+        str | None
+            The url or None, as appropriate.
         """
         if remote is False:
             return None
@@ -84,8 +85,9 @@ class SPICEKernel:
 
         Returns
         -------
-        True if the timestamps match, False if they don't or if there is no
-        local kernel copy.
+        bool
+            True if the timestamps match, False if they don't or if there is no
+            local kernel copy.
         """
         fmt = '%a, %d %b %Y %H:%M:%S %Z'
         remote_timestamp = datetime.strptime(
@@ -107,7 +109,8 @@ class SPICEKernel:
 
         Returns
         -------
-        None.
+        None
+            None.
         """
         # if this is a custom kernel, skip downloading
         if self._remote_directory is None:
@@ -150,7 +153,8 @@ class SPICEKernel:
 
         Returns
         -------
-        None.
+        None
+            None.
         """
         spiceypy.furnsh(str(self.local_path))
 
@@ -288,7 +292,8 @@ class EarthObservatory:
 
         Returns
         -------
-        A list containing the SPK kernel for this observatory.
+        list[SPICEKernel]
+            A list containing the SPK kernel for this observatory.
         """
         path = self._make_spk_kernel(overwrite=overwrite)
         kernel = SPICEKernel(name=f'{self._name.lower()}.bsp',
@@ -314,7 +319,8 @@ def _earth_obs_kernel_from_name(name: str,
 
     Returns
     -------
-    A list containing the SPK kernel for this observatory.
+    list[SPICEKernel]
+        A list containing the SPK kernel for this observatory.
     """
     location = EarthLocation.of_site(name)
     observatory = EarthObservatory(
@@ -353,7 +359,8 @@ def _earth_obs_kernel_from_coords(name: str,
 
     Returns
     -------
-    A list containing the SPK kernel for this observatory.
+    list[SPICEKernel]
+        A list containing the SPK kernel for this observatory.
     """
     observatory = EarthObservatory(
         name=name, latitude=latitude, longitude=longitude, altitude=altitude,
@@ -370,8 +377,9 @@ def _get_outer_planet_kernels(
 
     Returns
     -------
-    A list of SPICEKernel objects for Mars, Jupiter, Saturn, Uranus, Neptune
-    or Pluto.
+    list[SPICEKernel]
+        A list of SPICEKernel objects for Mars, Jupiter, Saturn, Uranus,
+        Neptune or Pluto.
     """
     kernels = []
     for satellite_kernel in satellite_kernels:
@@ -396,7 +404,8 @@ def _get_spacecraft_kernels(kernel_names: list[str],
 
     Returns
     -------
-    A list of SPICEKernel objects for the spacecraft.
+    list[SPICEKernel]
+        A list of SPICEKernel objects for the spacecraft.
     """
     kernels = []
     for kernel in kernel_names:
@@ -465,7 +474,7 @@ def _get_uncommon_kernels() -> tuple[dict[str, list[SPICEKernel]],
     return all_kernels, spacecraft, observatories
 
 
-def load_spice_kernels(download: bool = True):
+def load_spice_kernels(download: bool = True) -> None:
     """
     Wrapper function to download/update all SPICE kernels and furnish them.
     If you don't want to download/update them, you don't have to.
@@ -477,7 +486,8 @@ def load_spice_kernels(download: bool = True):
 
     Returns
     -------
-    A list of available observatory names.
+    None
+        None.
     """
     for kernel in common_kernels:
         if download:
@@ -496,6 +506,11 @@ def load_spice_kernels(download: bool = True):
 def get_available_spacecraft() -> list[str]:
     """
     Get a list of all available spacecraft.
+
+    Returns
+    -------
+    list[str]
+        A list of all available spacecraft observatories.
     """
     return _get_uncommon_kernels()[1]
 
@@ -503,5 +518,10 @@ def get_available_spacecraft() -> list[str]:
 def get_available_observatories() -> list[str]:
     """
     Get a list of all available observatories.
+
+    Returns
+    -------
+    list[str]
+        A list of all available Earth ground-based observatories.
     """
     return _get_uncommon_kernels()[2]

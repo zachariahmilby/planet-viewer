@@ -10,10 +10,9 @@ from matplotlib.patches import Polygon
 
 from planetviewer.spice_functions import ref
 
-"""Default WCS window shape."""
 wcs_shape = (3, 3)
+"""Default WCS window shape."""
 
-"""A set of standard colors."""
 standard_colors = {
     'red': '#D62728',
     'orange': '#FF7F0E',
@@ -33,8 +32,7 @@ standard_colors = {
     'black': '#000000',
     'white': '#FFFFFF',
 }
-
-"""Default Matplotlib keyword arguments for various objects."""
+"""A set of standard colors."""
 
 
 def _default_limb_kwargs() -> dict:
@@ -124,7 +122,8 @@ def make_wcs(center: SkyCoord,
 
     Returns
     -------
-    The WCS for plotting and coordinate transforms.
+    WCS
+        The WCS for plotting and coordinate transforms.
     """
     fov *= 1.000001  # helps ensure the actual edge values are shown
     wcs = WCS(naxis=2)
@@ -148,7 +147,8 @@ def set_standard_axis_labels(axis: WCSAxes) -> None:
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     axis.set_xlabel(f'Right Ascension ({ref})')
     axis.set_ylabel(f'Declination ({ref})')
@@ -167,7 +167,8 @@ def set_standard_axis_limits(axis: WCSAxes) -> None:
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     axis.set_xlim(-0.5, wcs_shape[0] - 0.5)
     axis.set_ylim(-0.5, wcs_shape[1] - 0.5)
@@ -189,7 +190,8 @@ def convert_to_relative_axis(center: SkyCoord,
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     # Remove the absolute coordinates
     ra = axis.coords['ra']
@@ -217,7 +219,8 @@ def convert_to_relative_axis(center: SkyCoord,
     ra_offset.coord_wrap = 180 * u.degree
 
 
-def _parse_kwargs(kwargs: dict, default_kwargs: dict) -> dict:
+def _parse_kwargs(kwargs: dict,
+                  default_kwargs: dict) -> dict:
     """
     Combine any user-provided kwargs with existing default kwargs, overriding 
     the defaults when necessary.
@@ -231,7 +234,8 @@ def _parse_kwargs(kwargs: dict, default_kwargs: dict) -> dict:
 
     Returns
     -------
-    The combined kwargs.
+    dict
+        The combined kwargs.
     """
     parsed_kwargs = dict()
     if kwargs is None:  # noqa
@@ -261,7 +265,8 @@ def _offset_coord(coord: SkyCoord,
 
     Returns
     -------
-    The offset coordinate as an Astropy `SkyCoord` object.
+    SkyCoord
+        The offset coordinate as an Astropy `SkyCoord` object.
     """
     return coord.spherical_offsets_by(dra, ddec)
 
@@ -283,7 +288,8 @@ def _retrieve_coords(coords: list[SkyCoord],
 
     Returns
     -------
-    A tuple of arrays containing the RA and Dec in degrees.
+    tuple[np.ndarray, np.ndarray]
+        A tuple of arrays containing the RA and Dec in degrees.
     """
     ra = []
     dec = []
@@ -305,7 +311,7 @@ def plot_limb(axis: WCSAxes,
     
     Parameters
     ----------
-    axis : plt.Axes or WCSAxes
+    axis : WCSAxes
         The axis in which to plot the limb.
     coords : list[SkyCoord]
         The coordinates of the target body's limb. Can be generated with the
@@ -320,7 +326,8 @@ def plot_limb(axis: WCSAxes,
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_limb_kwargs())
@@ -343,22 +350,23 @@ def plot_disk(axis: WCSAxes,
 
     Parameters
     ----------
-    axis : plt.Axes or WCSAxes
+    axis : WCSAxes
         The axis in which to plot the disk.
     coords : list[SkyCoord]
         The coordinates of the target body's limb. Can be generated with the
         `Planet` method 'get_limb_sky_coordinates'.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `Polygon` patch keyword arguments like
         `facecolor `, `linewidth`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_disk_kwargs())
@@ -381,7 +389,7 @@ def plot_nightside(axis: WCSAxes,
 
     Parameters
     ----------
-    axis : plt.Axes or WCSAxes
+    axis : WCSAxes
         The axis in which to plot the nightside shading.
     limb_coords : list[SkyCoord]
         The coordinates of the target body's limb. Can be generated with the
@@ -389,17 +397,18 @@ def plot_nightside(axis: WCSAxes,
     terminator_coords : list[SkyCoord]
         The coordinates of the target body's terminator. Can be generated with
         the `Planet` method 'get_terminator_sky_coordinates'.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `Polygon` patch keyword arguments like
         `facecolor `, `linewidth`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_night_patch_kwargs())
@@ -454,7 +463,7 @@ def plot_primary_shadow(axis: WCSAxes,
 
     Parameters
     ----------
-    axis : plt.Axes or WCSAxes
+    axis : WCSAxes
         The axis in which to plot the nightside shading.
     disk_coords : list[SkyCoord]
         The coordinates of the target body's apparent dayside. Can be generated
@@ -463,17 +472,18 @@ def plot_primary_shadow(axis: WCSAxes,
         The coordinates of the shadow casting body's shadow where it intersects
         the target body's disk. Can be generated with the
         `Planet` method 'get_shadow_intersection_sky_coordinates'.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `Polygon` patch keyword arguments like
         `facecolor `, `linewidth`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     plot_nightside(axis, disk_coords, shadow_coords, dra, ddec,
                    **kwargs)
@@ -491,23 +501,24 @@ def plot_latlon(axis: WCSAxes,
 
     Parameters
     ----------
-    axis : plt.Axes or WCSAxes
+    axis : WCSAxes
         The axis in which to plot the latitude or longitude gridlines.
     coords : list[SkyCoord]
         The coordinates of the target body's latitude or longitude line. Can be
         generated with the `Planet` method `get_longitude_line_coordinates` or
         `get_latitude_line_coordinates`.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `plot` keyword arguments like `linewidth`,
         `color`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_latlon_kwargs())
@@ -602,10 +613,10 @@ def plot_ring(axis: WCSAxes,
     side : str
         The side of the rings to plot, either 'front' or 'back'. You'll want to
         plot the back first, then plot the planet, then the front.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     eclipse_edge_kwargs : dict, optional
         Additional Matplotlib `plot` keyword arguments like `linewidth`,
         `color`, etc. for the edges of the eclipsed portions of the rings.
@@ -623,7 +634,8 @@ def plot_ring(axis: WCSAxes,
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     eclipse_edge_kwargs = _parse_kwargs(eclipse_edge_kwargs,
@@ -754,6 +766,8 @@ def place_ring_pericenter_markers(axis: WCSAxes,
                                   ddec: Angle = Angle(0, unit='deg'),
                                   **kwargs) -> None:
     """
+    Scatterplot markers at the pericenter or eccentric rings. Currently
+    applicable only to some of the rings of Uranus.
 
     Parameters
     ----------
@@ -771,10 +785,10 @@ def place_ring_pericenter_markers(axis: WCSAxes,
     side : str
         The side of the rings to plot, either 'front' or 'back'. You'll want to
         plot the back first, then plot the planet, then the front.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `scatter` keyword arguments like `marker`,
         `size`, `color`, etc. for the markers of the ring pericenter. Currently
@@ -782,7 +796,8 @@ def place_ring_pericenter_markers(axis: WCSAxes,
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_pericenter_marker_kwargs())
@@ -819,17 +834,18 @@ def plot_arc(axis: WCSAxes,
     coords : list[SkyCoord]
         The coordinates of the ring arc. Can be generated with the `Ring`
         method `get_arc_sky_coordinates`.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `plot` keyword arguments like `linewidth`,
         `color`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_arc_kwargs())
@@ -861,12 +877,13 @@ def _parse_object_label_position(label_position: str) -> dict:
 
     Returns
     -------
-    A dictionary containing 'ha', 'va', 'dx', 'dy' and 'xytext'. 'ha' and 'va'
-    are the text alignments. 'dx' and 'dy' are the scale factors for the `xy`
-    argument (for example, to place the label 1 planetary radius away from the
-    coordinate `(x0, y0)`, you'd supply `xy=(x0+radius*dx, y0+radius*dy)`.
-    Finally, 'xytext' is the text offset in points. Here I've chosen 1/4 of the
-    fontsize. Seems to look good.
+    dict
+        A dictionary containing 'ha', 'va', 'dx', 'dy' and 'xytext'. 'ha' and
+        'va' are the text alignments. 'dx' and 'dy' are the scale factors for
+        the `xy` argument (for example, to place the label 1 planetary radius
+        away from the coordinate `(x0, y0)`, you'd supply `xy=(x0+radius*dx,
+        y0+radius*dy)`. Finally, 'xytext' is the text offset in points. Here
+        I've chosen 1/4 of the fontsize. Seems to look good.
     """
     fs = plt.rcParams['font.size']
 
@@ -930,17 +947,18 @@ def place_label(axis: WCSAxes,
         `Planet` method `get_skycoord`.
     body_radius : Angle
         The angular radius of the object.
-    dra : Angle
-        Optional angular offset in right ascension.
-    ddec : Angle
-        Optional angular offset in declination.
+    dra : Angle, optional
+        Angular offset in right ascension.
+    ddec : Angle, optional
+        Angular offset in declination.
     **kwargs
         Additional Matplotlib `text` keyword arguments like `fontsize`,
         `color`, etc.
 
     Returns
     -------
-    None.
+    None
+        None.
     """
 
     position = _parse_object_label_position(position)

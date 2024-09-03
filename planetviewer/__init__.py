@@ -1,7 +1,7 @@
 from planetviewer.spice_kernels import (load_spice_kernels,
                                         get_available_spacecraft,
                                         get_available_observatories)
-from planetviewer.objects import Planet, Ring, Arc
+from planetviewer.objects import SolarSystemObject, Ring, Arc
 from planetviewer.spice_functions import (abcorr,
                                           ref,
                                           subpoint_method,

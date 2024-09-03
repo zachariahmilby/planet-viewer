@@ -43,7 +43,8 @@ def _r(semimajor_axis: u.Quantity,
 
     Returns
     -------
-    The radial disance as a function of true anomaly and semimajor axis.
+    u.Quantity
+        The radial disance as a function of true anomaly and semimajor axis.
     """
     numerator = semimajor_axis * (1 - eccentricity ** 2)
     denominator = 1 + eccentricity * np.cos(true_anomaly)
@@ -121,7 +122,8 @@ def _ring_xyz(time: Time,
 
     Returns
     -------
-    A tuple (x, y, z) containing the vector components.
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        A tuple of arrays containing the (x, y, z) vector components.
     """
 
     if edge == 'inner':
@@ -237,18 +239,22 @@ class Arc:
 
     @property
     def name(self) -> str:
+        """The name of the arc."""
         return self._name
 
     @property
     def min_longitude(self) -> u.Quantity:
+        """The minimum longitude of the arc."""
         return self._min_longitude
 
     @property
     def delta_longitude(self) -> u.Quantity:
+        """The longitudinal length of the arc."""
         return self._max_longitude - self._min_longitude
 
     @property
     def dlon_dt(self) -> u.Quantity:
+        """The precession rate of the arc."""
         return self._dlon_dt
 
 
@@ -360,7 +366,8 @@ class Ring:
 
         Returns
         -------
-        A tuple (x, y, z) containing the vector components.
+        tuple[np.ndarray, np.ndarray, np.ndarray]
+            A tuple of arrays containing the (x, y, z) vector components.
         """
         args = dict(
             time=time,
@@ -381,7 +388,7 @@ class Ring:
             dminlon_dt=dminlon_dt,
             delta_lon=delta_lon,
             boundaries=boundaries)
-        return _ring_xyz(**args)
+        return _ring_xyz(**args)  # noqa
 
     # noinspection DuplicatedCode
     def _get_sky_coordinates(
@@ -428,8 +435,9 @@ class Ring:
 
         Returns
         -------
-        A list containing the ring sky coordinates as Astropy `SkyCoord`
-        objects.
+        list[SkyCoord] | None
+            A list containing the ring sky coordinates as Astropy `SkyCoord`
+            objects.
         """
         et = get_et(time)
         args = dict(time=time,
@@ -509,8 +517,9 @@ class Ring:
 
         Returns
         -------
-        An array of distances from the observer to each ring segment as an
-        Astropy `Quantity` object.
+        u.Quantity | None
+            An array of distances from the observer to each ring segment as an
+            Astropy `Quantity` object.
         """
         et = spiceypy.str2et(time.to_string())
         args = dict(time=time,
@@ -555,7 +564,7 @@ class Ring:
                             minlon: u.Quantity = 0 * u.degree,
                             dminlon_dt: u.Quantity = 0 * u.degree / u.day,
                             delta_lon: u.Quantity = 360 * u.degree,
-                            boundaries: bool = False):
+                            boundaries: bool = False) -> np.ndarray:
         """
         Determine if a ring segment is eclipsed by the planet relative to the
         Sun.
@@ -586,8 +595,9 @@ class Ring:
 
         Returns
         -------
-        A boolean array indicating whether a ring segment is eclipsed or not.
-        `True` means it is eclipsed. `False` means it is lit.
+        np.ndarray
+            A boolean array indicating whether a ring segment is eclipsed or 
+            not. `True` means it is eclipsed. `False` means it is lit.
         """
         observer = 'Sun'
         et = spiceypy.str2et(time.to_string())
@@ -664,8 +674,9 @@ class Ring:
 
         Returns
         -------
-        A list containing the ring sky coordinates as Astropy `SkyCoord`
-        objects.
+        list[SkyCoord]
+            A list containing the ring sky coordinates as Astropy `SkyCoord`
+            objects.
         """
         args = dict(time=time,
                     observer=observer,
@@ -704,8 +715,9 @@ class Ring:
 
         Returns
         -------
-        An array of distances from the observer to each ring segment as an
-        Astropy `Quantity` object.
+        u.Quantity
+            An array of distances from the observer to each ring segment as an
+            Astropy `Quantity` object.
         """
         args = dict(time=time,
                     observer=observer,
@@ -718,7 +730,7 @@ class Ring:
                      time: Time,
                      step: u.Quantity = 1 * u.degree,
                      pericenter: bool = False,
-                     edge: str = None):
+                     edge: str = None) -> np.ndarray:
         """
         Determine if a ring segment is eclipsed by the planet relative to the
         Sun for a given time and observer.
@@ -738,8 +750,9 @@ class Ring:
 
         Returns
         -------
-        A boolean array indicating whether a ring segment is eclipsed or not.
-        `True` means it is eclipsed. `False` means it is lit.
+        np.ndarray
+            A boolean array indicating whether a ring segment is eclipsed or 
+            not. `True` means it is eclipsed. `False` means it is lit.
         """
         args = dict(time=time,
                     step=step,
@@ -778,8 +791,9 @@ class Ring:
 
         Returns
         -------
-        A list containing the ring sky coordinates as Astropy `SkyCoord`
-        objects.
+        list[SkyCoord]
+            A list containing the ring sky coordinates as Astropy `SkyCoord`
+            objects.
         """
         arc = self._arcs[name]
         args = dict(time=time,
@@ -821,8 +835,9 @@ class Ring:
 
         Returns
         -------
-        An array of distances from the observer to each ring segment as an
-        Astropy `Quantity` object.
+        u.Quantity
+            An array of distances from the observer to each ring segment as an
+            Astropy `Quantity` object.
         """
         arc = self._arcs[name]
         args = dict(time=time,
@@ -837,48 +852,66 @@ class Ring:
 
     @property
     def name(self) -> str:
+        """The name of the ring."""
         return self._name
 
     @property
     def semimajor_axis(self) -> u.Quantity:
+        """The ring's semimajor axis."""
         return self._semimajor_axis
 
     @property
     def width(self) -> u.Quantity:
+        """The ring's radial width."""
         return self._width
 
     @property
     def eccentricity(self) -> float:
+        """The ring's eccentricity, if any."""
         return self._eccentricity
 
     @property
     def inclination(self) -> u.Quantity:
+        """The ring's inclination, if any."""
         return self._inclination
 
     @property
     def longitude_of_periapsis(self) -> u.Quantity:
+        """The ring's longitude of periapsis, if any."""
         return self._longitude_of_periapsis
 
     @property
     def longitude_of_ascending_node(self) -> u.Quantity:
+        """The ring's longitude of ascending node, if any."""
         return self._longitude_of_ascending_node
 
     @property
     def dlon_dt(self) -> u.Quantity:
+        """The precession rate of the ring's peripasis, if any."""
         return self._dlon_dt
 
     @property
     def dnode_dt(self) -> u.Quantity:
+        """The precession rate of the ring's ascending node, if any."""
         return self._dnode_dt
 
     @property
-    def arcs(self) -> dict[str, dict]:
+    def arcs(self) -> dict[str, Arc]:
+        """A dictionary containing any ring arcs as `Arc` objects."""
         return self._arcs
 
 
-class Planet:
-
+class SolarSystemObject:
+    """
+    A Solar System object like a major planet, a minor planet or a satellite.
+    """
     def __init__(self, name: str):
+        """
+        Parameters
+        ----------
+        name : str
+            The name of the Solar System object. Must be available in SPICE.
+        """
         self._name = name
         self._code = spiceypy.bodn2c(name)
         self._prograde = determine_prograde_rotation(name)
@@ -907,7 +940,8 @@ class Planet:
 
         Returns
         -------
-        The RA as either a string or Astropy `Angle` object.
+        str | Angle
+            The RA as either a string or Astropy `Angle` object.
         """
         et = get_et(time)
         ra, _ = get_sky_coordinates(self._name, et, observer)
@@ -939,7 +973,8 @@ class Planet:
 
         Returns
         -------
-        The declination as either a string or Astropy `Angle` object.
+        str | Angle
+            The declination as either a string or Astropy `Angle` object.
         """
         et = get_et(time)
         _, dec = get_sky_coordinates(self._name, et, observer)
@@ -967,7 +1002,8 @@ class Planet:
 
         Returns
         -------
-        The sky coordinates as an Astropy `SkyCoord` object.
+        SkyCoord
+            The sky coordinates as an Astropy `SkyCoord` object.
         """
         et = get_et(time)
         ra, dec = get_sky_coordinates(self._name, et, observer)
@@ -994,9 +1030,10 @@ class Planet:
 
         Returns
         -------
-        The spherical offset between this body and a reference body as Astropy
-        `Angle` objects in units of arcseconds. If `refcoord` is not provided,
-        then the returned offset will be (0, 0).
+        tuple[Angle, Angle]
+            The spherical offset between this body and a reference body as 
+            Astropy `Angle` objects in units of arcseconds. If `refcoord` is 
+            not provided, then the returned offset will be (0, 0).
         """
         if refcoord is None:
             return Angle('0d').to(u.arcsec), Angle('0d').to(u.arcsec)
@@ -1022,8 +1059,9 @@ class Planet:
 
         Returns
         -------
-        The sub-observer planetographic latitude as an Astropy `Latitude`
-        object.
+        Latitude
+            The sub-observer planetographic latitude as an Astropy `Latitude`
+            object.
         """
         et = get_et(time)
         lat, _ = get_sub_observer_latlon(self._name, et, observer)
@@ -1047,8 +1085,9 @@ class Planet:
 
         Returns
         -------
-        The sub-observer planetographic latitude as an Astropy `Longitude`
-        object.
+        Longitude
+            The sub-observer planetographic latitude as an Astropy `Longitude`
+            object.
         """
         et = get_et(time)
         _, lon = get_sub_observer_latlon(self._name, et, observer)
@@ -1072,8 +1111,9 @@ class Planet:
 
         Returns
         -------
-        The sub-observer planetographic latitude as an Astropy `Latitude`
-        object.
+        Latitude
+            The sub-observer planetographic latitude as an Astropy `Latitude`
+            object.
         """
         et = get_et(time)
         lat, _ = get_sub_solar_latlon(self._name, et, observer)
@@ -1097,8 +1137,9 @@ class Planet:
 
         Returns
         -------
-        The sub-observer planetographic latitude as an Astropy `Longitude`
-        object.
+        Longitude
+            The sub-observer planetographic latitude as an Astropy `Longitude`
+            object.
         """
         et = get_et(time)
         _, lon = get_sub_solar_latlon(self._name, et, observer)
@@ -1122,7 +1163,9 @@ class Planet:
 
         Returns
         -------
-        The phase angle at the sub-observer point as an Astropy `Angle` object.
+        Angle
+            The phase angle at the sub-observer point as an Astropy `Angle` 
+            object.
         """
         et = get_et(time)
         phase = get_sub_observer_phase_angle(self._name, et, observer)
@@ -1146,7 +1189,8 @@ class Planet:
 
         Returns
         -------
-        The distance to the object as an Astropy `Quantity` object.
+        u.Quantity
+            The distance to the object as an Astropy `Quantity` object.
         """
         et = get_et(time)
         vec = get_state(self._name, et, observer)
@@ -1169,7 +1213,8 @@ class Planet:
 
         Returns
         -------
-        The sub-solar latitude as an Astropy `Latitude` object.
+        Latitude
+            The sub-solar latitude as an Astropy `Latitude` object.
         """
         return self.get_subsolar_latitude(time, observer)
 
@@ -1178,7 +1223,7 @@ class Planet:
                                          observer: str
                                          ) -> tuple[Latitude, Latitude]:
         """
-        Get the range in subsolar latitude due to the apparent angular size of
+        Get the range in sub-solar latitude due to the apparent angular size of
         the Sun.
 
         Parameters
@@ -1192,7 +1237,8 @@ class Planet:
 
         Returns
         -------
-
+        tuple[Latitude, Latitude]
+            The range in sub-solar latitude.
         """
         _, radii = spiceypy.bodvcd(10, 'RADII', 3)
         et = get_et(time)
@@ -1219,7 +1265,8 @@ class Planet:
 
         Returns
         -------
-        The ring plane opening angle as an Astropy `Angle` object.
+        Angle
+            The ring plane opening angle as an Astropy `Angle` object.
         """
         return Angle(self.get_sub_observer_latitude(time, observer))
 
@@ -1241,7 +1288,8 @@ class Planet:
 
         Returns
         -------
-        A bool indicating if the rings are illuminated to the observer.
+        bool
+            A bool indicating if the rings are illuminated to the observer.
         """
         lat0, lat1 = self.get_ring_subsolar_latitude_range(time, observer)
         sun_on_one_side_of_plane = np.sign(lat0) == np.sign(lat1)
@@ -1274,7 +1322,8 @@ class Planet:
 
         Returns
         -------
-        The body phase angle as an Astropy `Angle` object.
+        Angle
+            The body phase angle as an Astropy `Angle` object.
         """
         return self.get_phase_angle(time, observer).to(u.degree)
 
@@ -1292,8 +1341,9 @@ class Planet:
 
         Returns
         -------
-        The planetographic longitude of the ring plane ascending node as an
-        Astropy `Longitude` object.
+        Longitude
+            The planetographic longitude of the ring plane ascending node as an
+            Astropy `Longitude` object.
         """
         et = get_et(time)
         ra, _, _, _ = spiceypy.bodeul(self._code, et)
@@ -1333,9 +1383,10 @@ class Planet:
 
         Returns
         -------
-        The sub-solar or sub-observer longitude planetographic longitude
-        relative to the ring plane ascending node as an Astropy `Longitude`
-        object.
+        Longitude
+            The sub-solar or sub-observer longitude planetographic longitude
+            relative to the ring plane ascending node as an Astropy `Longitude`
+            object.
         """
         ascnode = self.get_ascending_node_longitude(time)
         if desc == 'solar':
@@ -1363,8 +1414,9 @@ class Planet:
 
         Returns
         -------
-        The sub-solar longitude of the rings relative to the plane ascending
-        node as an Astropy `Longitude` object.
+        Longitude
+            The sub-solar longitude of the rings relative to the plane
+            ascending node as an Astropy `Longitude` object.
         """
         return self._get_ring_sub_longitude(time, observer, 'solar')
 
@@ -1386,8 +1438,9 @@ class Planet:
 
         Returns
         -------
-        The sub-observer longitude of the rings relative to the plane ascending
-        node as an Astropy `Longitude` object.
+        Longitude
+            The sub-observer longitude of the rings relative to the plane
+            ascending node as an Astropy `Longitude` object.
         """
         return self._get_ring_sub_longitude(time, observer, 'observer')
 
@@ -1406,8 +1459,9 @@ class Planet:
 
         Returns
         -------
-        The distance between the Sun and the target as an Astropy `Quantity`
-        object.
+        u.Quantity
+            The distance between the Sun and the target as an Astropy
+            `Quantity` object.
         """
         return self.get_distance(time, 'Sun').to(unit)
 
@@ -1428,8 +1482,9 @@ class Planet:
 
         Returns
         -------
-        The distance between the observer and the target as an Astropy
-        `Quantity` object.
+        u.Quantity
+            The distance between the observer and the target as an Astropy
+            `Quantity` object.
         """
         return self.get_distance(time, observer)
 
@@ -1450,8 +1505,9 @@ class Planet:
 
         Returns
         -------
-        The light travel time between the observer and the target as an Astropy
-        `Quantity` object.
+        u.Quantity
+            The light travel time between the observer and the target as an
+            Astropy `Quantity` object.
         """
         et = get_et(time)
         return get_light_time(self._name, et, observer) * u.s
@@ -1460,8 +1516,7 @@ class Planet:
                                    time: Time,
                                    observer: str,
                                    latitude: u.Quantity,
-                                   longitude: u.Quantity,
-                                   ) -> list[SkyCoord] or SkyCoord:
+                                   longitude: u.Quantity) -> SkyCoord:
         """
         Get the right ascension and declination of of a latitude/longitude
         point on the body's surface for a given observer and observation time.
@@ -1481,8 +1536,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the latitude/longitude point
-        as an Astropy `SkyCoord` object.'
+        SkyCoord
+            The right ascension and declination of the latitude/longitude point
+            as an Astropy `SkyCoord` object.'
         """
         et = get_et(time)
         latitude = latitude.to(u.rad).value
@@ -1516,8 +1572,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the longitude line as a list of
-        Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the longitude line as a list
+            of Astropy `SkyCoord` objects.'
         """
         latitudes = np.linspace(-90, 90, int(180/dlat.value) + 1) * u.degree
         coords = []
@@ -1551,8 +1608,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the latitude line as a list of
-        Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the latitude line as a list
+            of Astropy `SkyCoord` objects.'
         """
         longitudes = np.linspace(-180, 180, int(360/dlon.value) + 1) * u.degree
         coords = []
@@ -1581,7 +1639,8 @@ class Planet:
 
         Returns
         -------
-        The coordinates as a list of Astropy `SkyCoord` objects.
+        list[SkyCoord]
+            The coordinates as a list of Astropy `SkyCoord` objects.
         """
         et = get_et(time)
         ras, decs = radec_func(et=et, **kwargs)
@@ -1614,8 +1673,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the body's limb as a list of
-        Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the body's limb as a list of
+            Astropy `SkyCoord` objects.'
         """
         kwargs = dict(time=time,
                       radec_func=get_limb_radec,
@@ -1652,8 +1712,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the body's limb as a list of
-        Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the body's limb as a list of
+            Astropy `SkyCoord` objects.'
         """
         kwargs = dict(time=time,
                       radec_func=get_terminator_radec,
@@ -1686,8 +1747,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the body's apparent dayside disk
-        as a list of Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the body's apparent dayside
+            disk as a list of Astropy `SkyCoord` objects.'
         """
         kwargs = dict(time=time,
                       radec_func=get_dayside_radec,
@@ -1723,8 +1785,9 @@ class Planet:
 
         Returns
         -------
-        The right ascension and declination of the body's apparent dayside disk
-        as a list of Astropy `SkyCoord` objects.'
+        list[SkyCoord]
+            The right ascension and declination of the body's apparent dayside
+            disk as a list of Astropy `SkyCoord` objects.'
         """
         kwargs = dict(time=time,
                       radec_func=get_shadow_intercept,
@@ -1736,7 +1799,7 @@ class Planet:
 
     def get_angular_radius(self,
                            time: Time,
-                           observer: str,) -> Angle:
+                           observer: str) -> Angle:
         """
         Get the body's angular radius for a given observer and observation
         time. Calculated using the object's mean equatorial radius.
@@ -1752,27 +1815,30 @@ class Planet:
 
         Returns
         -------
-        The angular radius of the body as an Astropy `Angle` object.
+        Angle
+            The angular radius of the body as an Astropy `Angle` object.
         """
         distance = self.get_distance(time, observer)
         re = np.mean(get_radii(self._name)[:2])
         return Angle(np.arctan(re * length_unit / distance)).to(u.arcsec)
 
     @staticmethod
-    def _parse_unit(value, unit) -> u.Quantity:
+    def _parse_unit(value: int | float,
+                    unit: u.Unit) -> u.Quantity:
         """
         Replace NaN values with zero.
 
         Parameters
         ----------
-        value : int or float
+        value : int | float
             The quantity's value.
         unit : u.Unit
             The quantity's unit.
 
         Returns
         -------
-        The parsed quantity as an Astropy `Quantity` object.
+        u.Quantity
+            The parsed quantity as an Astropy `Quantity` object.
         """
         if np.isnan(value):
             return 0.0 * unit
@@ -1790,7 +1856,8 @@ class Planet:
 
         Returns
         -------
-        A dictionary like the input dictionary but now with units.
+        dict
+            A dictionary like the input dictionary but now with units.
         """
         lengths = ['semimajor_axis', 'width']
         for i in lengths:
@@ -1831,7 +1898,8 @@ class Planet:
 
         Returns
         -------
-        The ring as a `Ring` object.
+        Ring
+            The ring as a `Ring` object.
         """
         ascending_node = self.get_ascending_node_longitude(properties['epoch'])
         offset = properties['longitude_offset']
@@ -1887,7 +1955,8 @@ class Planet:
         
         Returns
         -------
-        A dictionary of the rings as `Ring` objects.
+        dict[str, Ring]
+            A dictionary of the rings as `Ring` objects.
         """
         properties = pd.read_csv(Path(_project_directory, 'anc', 'rings.dat'))
         ring_arcs = pd.read_csv(Path(_project_directory, 'anc', 'arcs.dat'))
@@ -1955,7 +2024,8 @@ class Planet:
 
         Returns
         -------
-        The offsets in RA and Dec as Astropy `Angle` objects.
+        tuple[Angle, Angle]
+            The offsets in RA and Dec as Astropy `Angle` objects.
         """
         relative_coord = self.get_skycoord(relative_time, observer)
         current_coord = self.get_skycoord(current_time, observer)
@@ -1965,7 +2035,7 @@ class Planet:
     def parse_fov(self,
                   time: Time,
                   observer: str,
-                  fov: float or int or Angle or u.Quantity) -> Angle:
+                  fov: float | int | Angle | u.Quantity) -> Angle:
         """
         Convert distances at the target body to angular sizes on the sky. This
         could be an `Angle` or angular quantity with units like [rad], [deg] or
@@ -1985,12 +2055,14 @@ class Planet:
             The observer or observatory. Could be a Solar System body like
             "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
             like "Juno".
-        fov : u.Quantity
-            The width of the field-of-view.
+        fov : float | int | Angle | u.Quantity
+            The width of the field-of-view. If provided as a float or int, it
+            is assumed to be a multiple of the planet's apparent angular width.
 
         Returns
         -------
-        The angular field-of-view as an Astropy `Angle` object.
+        Angle
+            The angular field-of-view as an Astropy `Angle` object.
         """
         distance = self.get_distance(time, observer)
         if isinstance(fov, int) or isinstance(fov, float):
@@ -2004,7 +2076,7 @@ class Planet:
         return fov.to(u.arcsec)
 
     @staticmethod
-    def _parse_list_or_str(thing: list[str] or str) -> list[str]:
+    def _parse_list_or_str(thing: list[str] | str) -> list[str]:
         """
         Determine if a thing is a list of strings or a string. Helps account
         for people who supply single ring names as a string rather than a list
@@ -2012,12 +2084,13 @@ class Planet:
         
         Parameters
         ----------
-        thing : list[str] or str
+        thing : list[str] | str
             The thing in question.
 
         Returns
         -------
-        A list of string(s).
+        list[str]
+            A list of string(s).
         """
         if isinstance(thing, str):
             return [thing]
@@ -2028,7 +2101,7 @@ class Planet:
     def _get_ring_pericenters(
             ring: Ring,
             time: Time,
-            observer: str) -> tuple[SkyCoord, u.Quantity] or tuple[None, None]:
+            observer: str) -> tuple[SkyCoord, u.Quantity] | tuple[None, None]:
         """
         Convenience function to get the coordinate of and distance to the 
         ring's pericenter. Applies only to some of Uranus's rings.
@@ -2046,7 +2119,9 @@ class Planet:
 
         Returns
         -------
-        A tuple (`SkyCoord`, `Quantity`) of the coordinate and the distance.
+        tuple[SkyCoord, u.Quantity] | tuple[None, None]
+            A tuple (`SkyCoord`, `Quantity`) of the coordinate and the
+            distance.
         """
         args = dict(time=time, observer=observer, pericenter=True)
         pericenter_coord = ring.get_sky_coordinates(**args)
@@ -2063,8 +2138,8 @@ class Planet:
                              side: str,
                              dra: Angle,
                              ddec: Angle,
-                             rings: list[str] or None,
-                             arcs: list[str] or None) -> None:
+                             rings: list[str] | None,
+                             arcs: list[str] | None) -> None:
         """
         Since the rings have to be plotted twice (front half and back half),
         this combines all of the plotting logic into a single function.
@@ -2086,14 +2161,15 @@ class Planet:
             Optional angular offset in right ascension.
         ddec : Angle
             Optional angular offset in declination.
-        rings : list[str] or None
+        rings : list[str] | None
             The list of rings to plot.
-        arcs : list[str] or None
+        arcs : list[str] | None
             The list of arcs to plot.
 
         Returns
         -------
-        None.
+        None
+            None.
         """
         body_distance = self.get_distance(time, observer)
         edges = ['inner', 'outer']
@@ -2164,8 +2240,8 @@ class Planet:
              axis: WCSAxes,
              time: Time,
              observer: str,
-             rings: list[str] or str = None,
-             arcs: list[str] or str = None,
+             rings: list[str] | str = None,
+             arcs: list[str] | str = None,
              dra: Angle = Angle(0, unit='deg'),
              ddec: Angle = Angle(0, unit='deg')) -> None:
         """
@@ -2183,20 +2259,21 @@ class Planet:
             The observer or observatory. Could be a Solar System body like
             "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
             like "Juno".
-        rings : list[str] or None
+        rings : list[str] | str, optional
             A list of rings to plot. If `None`, all rings will be shown. If an
             empty list, no rings will be shown.
-        arcs : list[str] or None
+        arcs : list[str] | str, optional
             A list of arcs to plot. If `None`, all arcs will be shown. If an
             empty list, no arcs will be shown.
-        dra : Angle
-            Optional angular offset in right ascension.
-        ddec : Angle
-            Optional angular offset in declination.
+        dra : Angle, optional
+            Angular offset in right ascension.
+        ddec : Angle, optional
+            Angular offset in declination.
 
         Returns
         -------
-        None.
+        None
+            None.
         """
 
         # if not the primary body, plot any shadow from the primary body
@@ -2261,16 +2338,20 @@ class Planet:
 
     @property
     def name(self) -> str:
+        """The object's name."""
         return self._name
 
     @property
     def code(self) -> int:
+        """The object's NAIF ID code."""
         return self._code
 
     @property
     def prograde(self) -> bool:
+        """Whether or not the object rotates prograde as defined by the IAU."""
         return self._prograde
 
     @property
     def rings(self) -> dict[str, Ring]:
+        """A dictionary containing the object's rings, if any."""
         return self._rings

@@ -57,13 +57,13 @@ Observation epochs (the time of an observation at the observer) must be
 provided as Astropy `Time` objects.
 
 ## Ephemeris Calculations
-The fundamental object in `planetviewer` is `Planet`. You can choose from any 
-Solar System planet, dwarf planet or satellite known to the SPICE system. To 
-create a planet object, simply provide its name:
+The fundamental object in `planetviewer` is `SolarSystemBody`. You can choose 
+from any Solar System planet, dwarf planet or satellite known to the SPICE 
+system. To create a `SolarSystemBody` object, simply provide its name:
 
 ```
 from planetviewer import Planet
-planet = Planet('Jupiter')
+planet = SolarSystemBody('Jupiter')
 ```
 
 This object has a variety of built-in methods which allow you to calculate 
@@ -81,45 +81,15 @@ detailed below.
 > like Venus and Uranus, but I'll save that for another time. As a Boulder 
 > mom's bumper sticker might say, "be the change you want to see in the world."
 
-### Example
-Say you wanted to know the planet's right ascension and declination as observed 
-from the Keck Observatory on the summit of Maunakea on June 8, 2021 at 14:00 
-UTC. The method `get_skycoord()` will return the J2000 position of the planet 
-as an Astropy `SkyCoord` object. You just need to provide the name of the 
-observer (the Earth observatory site, spacecraft or SPICE ephemeris object; in 
-this case, `'Keck'`) and the time of the observation as an Astropy `Time` 
-object:
-
-```
-from astropy.time import Time
-from planetviewer import load_spice_kernels, Planet
-
-load_spice_kernels()
-
-time = Time('2021-06-08 14:00')
-observer = 'Keck'
-
-planet = Planet('Jupiter')
-coord = planet.get_skycoord(time=time, observer=observer)
-```
-
-`coord` is an Astropy `SkyCoord` object of the apparent position of Jupiter. In 
-this example, it is:
-```
-<SkyCoord (ICRS): (ra, dec) in deg
-    (333.99971902, -11.73147553)>
-```
+### Ephemeris Calculation Methods
+The following table lists all of the ephemeris methods available in the 
+`SolarSystemBody` object. These should calculate all of the information (and 
+more) returned by the various PDS planet viewers. See each method's docstring 
+for specifics on arguments and outputs.
 
 Almost every method requires the fundamental arguments `time` (as an Astropy 
 `Time` object) and `observer` (as a string). Other methods have additional 
-arguments detailed in their docstrings. See the table below for a summary of 
-each method.
-
-### Ephemeris Calculation Methods
-The following table lists all of the ephemeris methods available in the 
-`Planet` object. These should calculate all of the information (and more) 
-returned by the various PDS planet viewers. See each method's docstring for 
-specifics on arguments and outputs.
+arguments detailed in their docstrings.
 
 > **NOTE**<br>
 > These values may differ slightly from those reported by the planet viewers. 
@@ -169,10 +139,11 @@ presentations. Astropy provides a variety of convenient extensions to
 Matplotlib with produce excellent astronomical graphics, and the methods I've 
 created here are designed to interface with both Astropy's extensions.
 
-`Planet` objects can be drawn in parts (using the various functions described 
-below) or using the convenient `draw` method. Rings can be drawn for Outer 
-Solar System planets, and Neptune's Adams ring arcs can also be drawn. 
-Available rings can be found in the `rings` property of the `Planet` class.
+`SolarSystemBody` objects can be drawn in parts (using the various functions 
+described below) or using the convenient `draw` method. Rings can be drawn for 
+Outer Solar System planets, and Neptune's Adams ring arcs can also be drawn. 
+Available rings can be found in the `rings` property of the `SolarSystemBody` 
+class.
 
 The World Coordinate System (WCS) projection and corresponding transforms are 
 the core of the visualization system. Several functions conveniently calculate 
@@ -204,79 +175,3 @@ individual docstrings provide more detailed instructions for their use.
 | `set_standard_axis_labels`      | Set standard J2000 axis labels.                                                                  |
 | `set_standard_axis_limits`      | Ensures axis limits match the chosen center and FOV.                                             |
 | `convert_to_relative_axis`      | Convert axis from absolute RA/Dec to relative angle from the center.                             |
-
-### Example
-Here's how to produce a figure with a WCS axis centered on Neptune as observed 
-from Triton June 8, 2021 at 14:00 UTC with a 30 degree field of view:
-
-```
-import matplotlib.pyplot as plt
-from astropy.coordinates import Angle
-from astropy.time import Time
-
-from planetviewer import (load_spice_kernels, Planet, make_wcs, 
-                          set_standard_axis_limits, set_standard_axis_labels)
-
-time = Time('2021-06-08 14:00')
-observer = 'Triton'
-planet = Planet('Neptune')
-
-center = planet.get_skycoord(time=time, observer=observer)
-fov = planet.parse_fov(time=time, observer=observer, fov=Angle(30, unit='deg'))
-wcs = make_wcs(center=center, fov=fov)
-
-fig, axis = plt.subplots(subplot_kw=dict(projection=wcs))
-plt.grid()  # turn on RA/Dec sky grid
-
-set_standard_axis_limits(axis)
-set_standard_axis_labels(axis)
-```
-
-The last two functions are convenience functions to make sure the plot looks 
-the way it should. `set_standard_axis_limits` makes sure the axis limits are 
-set to the FOV you chose (this can change when different objects are drawn).
-`set_standard_axis_labels` sets the approrpriate axis labels. Here's what this 
-axis looks like:
-
-![](planetviewer/anc/docs/axis0.png)
-
-Now, you can add a plot of Neptune with `planet.draw(axis=axis, time=time, 
-observer=observer)`. This will draw Neptune with a latitude/longitude grid 
-spaced by 30° and all of its rings. You can also draw only specific rings or no
-rings (as detailed in the `Planet` docstring.) Notice how it draws the prime 
-meridian as a darker black line, shades the night side and even projects 
-Neptune's shadow onto the rings. It also draws the Adams ring arcs. 
-
-![](planetviewer/anc/docs/axis1.png)
-
-Now, let's add some satellites.
-```
-satellites = ['Proteus', 'Larissa', 'Galatea', 'Despina', 'Thalassa']
-for moon in satellites:
-    satellite = Planet(moon)
-    satellite.draw(axis=axis, time=time, observer=observer)
-```
-
-![](planetviewer/anc/docs/axis2.png)
-
-It looks like most of them are visible in the 30 degree FOV at the 
-observation time. Let's modify the above code block to label each of the 
-satellites using Matplotlib's `annotate` function.
-
-```
-transform = axis.get_transform('world')
-satellites = ['Proteus', 'Larissa', 'Galatea', 'Despina', 'Thalassa']
-for moon in satellites:
-    satellite = Planet(moon)
-    coord = satellite.get_skycoord(time=time, observer=observer)
-    axis.annotate(moon, xy=(coord.ra.deg, coord.dec.deg), xycoords=transform,
-                  annotation_clip=True)
-```
-
-![](planetviewer/anc/docs/axis3.png)
-
-There are of course many additional plotting options. For example, if I were 
-making this plot, I might sort all of the objects I want to plot by distance to 
-the observer (furthest to closest) and plot them in that order, that way any 
-objects which should be behind Jupiter are drawn first. These distances can be 
-calculated with each `Planet` object's `get_observer_target_distance` method.
