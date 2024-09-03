@@ -201,6 +201,9 @@ individual docstrings provide more detailed instructions for their use.
 | `place_ring_pericenter_markers` | Place markers at eccentric ring pericenters (applies only to some rings of Uranus).              |
 | `plot_arc`                      | Draw ring arc (applies only to Neptune's Adams ring).                                            |
 | `place_label`                   | Place a label at a given coordinate.                                                             |
+| `set_standard_axis_labels`      | Set standard J2000 axis labels.                                                                  |
+| `set_standard_axis_limits`      | Ensures axis limits match the chosen center and FOV.                                             |
+| `convert_to_relative_axis`      | Convert axis from absolute RA/Dec to relative angle from the center.                             |
 
 ### Example
 Here's how to produce a figure with a WCS axis centered on Neptune as observed 
