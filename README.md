@@ -93,8 +93,8 @@ arguments detailed in their docstrings.
 
 > **NOTE**<br>
 > These values may differ slightly from those reported by the planet viewers. 
-> They frequently used different aberration correction like 'LT' while I used 
-> 'LT+S' following the advice given in the SPICE documentation.
+> They frequently used different aberration correction like `'LT'` while I used 
+> `'LT+S'` following the advice given in the SPICE documentation.
 
 | Method                                    | Description                                                                                                 |
 |:------------------------------------------|:------------------------------------------------------------------------------------------------------------|
