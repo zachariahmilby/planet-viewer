@@ -1,13 +1,12 @@
-# `planetviewer`: Visualization Utilities for Solar System Observers 
+# `planetviewer`: Ephemeris and Visualization Utilities for Solar System Observers 
 
 `planetviewer` is a Python-based planetary geometry viewer based on the NASA 
-PDS Ring-Moon Systems Node (available 
-[here](https://pds-rings.seti.org/tools/)). It incorporates the functionality 
-of both Matplotlib and Astropy as detailed below. It is integrated with 
-Astropy's `Angle` and derived objects like `Longitude`, `Latitude`, and 
-`SkyCoord` along with its `units` module. Most of the functions and methods are 
-decently described in their docstrings, but I'll provide some overviews and a 
-few examples here.
+PDS Ring-Moon Systems Node [Planet Viewers](https://pds-rings.seti.org/tools/). 
+It incorporates the functionality of both Matplotlib and Astropy as detailed 
+below. It is integrated with Astropy's `Angle` and derived objects like 
+`Longitude`, `Latitude`, and `SkyCoord` along with its `units` module. Most of 
+the functions and methods are decently described in their docstrings, but I'll 
+provide some overviews and a few examples here.
 
 ## Installation
 Here are some installation instructions for the average Anaconda user; if 
