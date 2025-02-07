@@ -1966,7 +1966,7 @@ class SolarSystemBody:
         return Angle(np.arctan(re * length_unit / distance)).to(u.arcsec)
 
     def get_occultation(self,
-                        other_body: str,
+                        other_body_name: str,
                         time: Time,
                         observer: str) -> int:
         """
@@ -1993,7 +1993,7 @@ class SolarSystemBody:
 
         Parameters
         ----------
-        other_body : str
+        other_body_name : str
             The name of the other body.
         time : Time
             UTC at the time of observation.
@@ -2008,10 +2008,10 @@ class SolarSystemBody:
             The occultation code.
         """
         et = spice.str2et(time.isot)
-        return determine_occultation(self._name, other_body, et, observer)
+        return determine_occultation(self._name, other_body_name, et, observer)
 
     def get_eclipsed(self,
-                     other_body: str,
+                     other_body_name: str,
                      time: Time,
                      observer: str) -> int:
         """
@@ -2038,7 +2038,7 @@ class SolarSystemBody:
 
         Parameters
         ----------
-        other_body : str
+        other_body_name : str
             The name of the other body.
         time : Time
             UTC at the time of observation.
@@ -2053,7 +2053,7 @@ class SolarSystemBody:
             The occultation code.
         """
         et = spice.str2et(time.isot)
-        return determine_if_in_shadow(self._name, other_body, et, observer)
+        return determine_if_in_shadow(self._name, other_body_name, et, observer)
 
     def _make_ring(self, properties: dict) -> Ring:
         """

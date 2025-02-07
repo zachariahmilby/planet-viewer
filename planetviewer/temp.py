@@ -7,4 +7,4 @@ furnish_spice_kernels()
 satellite = SolarSystemBody('Europa')
 
 time = Time('2021-06-12 19:30')
-print(time.isot, satellite.get_occultation('Jupiter', time, 'Maunakea'))
+print(time.isot, satellite.get_occultation('Jupiter', time, 'Io'))

@@ -726,24 +726,23 @@ def determine_occultation(target1: str,
     Determine if one target occults another. The output code has the following
     meaning:
 
-    - `-3` : Total occultation of first target by second. This occurs when the
-             second target totally blocks the first target.
-    - `-2` : Annular occultation of first target by second. The second target
-             does not block the limb of the first. For instance, this occurs
-             when the first target is a small moon in transit.
-    - `-1` : Partial occultation of first target by second target. This is the
-             transition phase when the second target begins to transit across
-             the first target.
-    - `0` : No occultation or transit: both objects are completely visible to
-            the observer.
-    - `1` : Partial occultation of second target by first target. This is the
-            transition phase when the first target begins to transit across the
-            second target.
-    - `2` : Annular occultation of second target by first. For instance, this
-            occurs when the first target is a small moon transiting the second
-            target.
-    - `3` : Total occultation of second target by first. This occurs when the
-            first target totall blocks the second target.
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | Code | Meaning                                                                                                                                                                            |
+    +======+====================================================================================================================================================================================+
+    | -3   | Total occultation of first target by second. This occurs when the second target totally blocks the first target.                                                                   |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | -2   | Annular occultation of first target by second. The second target does not block the limb of the first. For instance, this occurs when the first target is a small moon in transit. |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | -1   | Partial occultation of first target by second target. This is the transition phase when the second target begins to transit across the first target.                               |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |  0   | No occultation or transit: both objects are completely visible to the observer.                                                                                                    |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |  1   | Partial occultation of second target by first target. This is the transition phase when the first target begins to transit across the second target.                               |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |  2   | Annular occultation of second target by first. For instance, this occurs when the first target is a small moon transiting the second target.                                       |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |  3   | Total occultation of second target by first. This occurs when the first target totall blocks the second target.                                                                    |
+    +------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     Parameters
     ----------
