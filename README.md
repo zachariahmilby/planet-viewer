@@ -1,12 +1,17 @@
 # `planetviewer`: Ephemeris and Visualization Utilities for Solar System Observers 
 
-`planetviewer` is a Python-based planetary geometry viewer based on the NASA 
-PDS Ring-Moon Systems Node [Planet Viewers](https://pds-rings.seti.org/tools/). 
-It incorporates the functionality of both Matplotlib and Astropy as detailed 
-below. It is integrated with Astropy's `Angle` and derived objects like 
-`Longitude`, `Latitude`, and `SkyCoord` along with its `units` module. Most of 
-the functions and methods are decently described in their docstrings, but I'll 
-provide some overviews and a few examples here.
+`planetviewer` is a Python-based planetary geometry viewer based on the
+[JPL Horizons Ephemeris Service](https://ssd.jpl.nasa.gov/horizons/) and the 
+NASA PDS Ring-Moon Systems Node 
+[Planet Viewers](https://pds-rings.seti.org/tools/). It incorporates the 
+functionality of both Matplotlib and Astropy as detailed below. In particular,
+it requires the use of Astropy convenience classes like `Time` for times and 
+dates, `Angle` (and the related classes `Longitude` and `Latitude`) for angular
+quantities and `Quantity` for other general physical quantities with units like
+distances, velocities, etc. These help to force users to be cognizant of the 
+units of inputs they provide. Most of the functions and methods are decently 
+described in their docstrings, but I'll provide some overviews and a few 
+examples here.
 
 >**CAUTION**<br>
 > Because of all of the Matplotlib transforms and plotting, this can be 
@@ -27,21 +32,22 @@ You're now ready to use the `planetviewer` package!
 ## SPICE Kernels
 
 `planetviewer` use NASA's SPICE system for ephemeris calculations. The 
-necessary data files for these computations (called "kernels") will be 
-automatically downloaded and kept up-to-date. The first time you load the 
-SPICE kernels using `load_spice_kernels()`, all necessary kernels will be 
-downloaded to your system. Everytime you subsequently run 
-`load_spice_kernels()`, the system will check to see if any have been updated 
-and will download any updated kernels. Depending on your Internet connection, 
-this can take tens of seconds or more to complete, so if you are running a 
-script frequently (for instance, you are making a plot and frequently making 
-minor changes then regenerating it to see the result), you can prevent this 
-check by supplying the keyword argument `download=False`.
+necessary data files for these computations (called "kernels") will need to be 
+downloaded. The first thing you need to do is set the local path where your 
+kernels are (or will be) stored. You can do this using `set_kernel_path()`. The 
+wrapper function `download_spice_kernels()` will download all needed kernels to
+the path you defined using `set_kernel_path()`. It will compare your current 
+kernels and will downloaded updated versions if they exist online. If you pass 
+the keyword argument `overwrite=True` every kernel will be downloaded again. 
+Once all the kernels have been downloaded, you will need to use 
+`furnish_spice_kernels()` to "furnish" them, meaning the information in them is
+available to use in calculations.
 
 > **NOTE**<br>
-> The first thing you will have to do to use (almost) any function or method in
-> `planetviewer` is load the SPICE kernels with the function 
-> `load_spice_kernels()`.
+> Once your kernels are up-to-date, you don't need to run 
+> `download_spice_kernels()` again until you want to update them. Using this 
+> package will subsequently only require you to set the local kernel path with 
+> `set_kernel_path()` and furnish the kernels with `furnish_spice_kernels()`.
 
 ## Observers
 The choice of observer/observatory can be one of three types:
@@ -50,10 +56,27 @@ satellites),
 2. A spacecraft, or
 3. A ground-based observatory on Earth.
 
-Available spacecraft can be found using the function 
-`get_available_spacecraft`. Available ground-based observatories can be found 
-using the function `get_available_observatories`. Each of these functions 
-returns a list with the names of the available locations.
+Available spacecraft:
+- `JWST`: James Webb Space Telescope
+- `HST`: Hubble Space Telescope
+- `Galileo`
+- `Juno`
+- `Cassini`
+- `Voyager 1`
+- `Voyager 2`
+
+Available ground-based Earth observatories:
+- `ALMA`: Atacama Large Millimeter/submillimeter Array
+- `Apache_Point`: Apache Point Observatory, New Mexico, United States
+- `Cahill_Roof`: Roof of Cahill Center for Astronomy and Astrophysics, Pasadena, California, United States
+- `Keck`: W. M. Keck Observatory, Hawaii, United States
+- `Kitt_Peak`: Kitt Peak National Observatory, Arizona, United States
+- `Lowell`: Lowell Observatory, Arizona, United States
+- `Maunakea`: W. M. Keck Observatory, Hawaii, United States
+- `McDonald`: McDonald Observatory, Texas, United States
+- `Palomar`: Palomar Observatory, California, United States
+- `Sommers_Bausch`: Sommers-Bausch Observatory, Colorado, United States
+- `VLT`: Very Large Telescope, Chile
 
 ## Times
 Observation epochs (the time of an observation at the observer) must be 
@@ -65,7 +88,7 @@ from any Solar System planet, dwarf planet or satellite known to the SPICE
 system. To create a `SolarSystemBody` object, simply provide its name:
 
 ```
-from planetviewer import Planet
+from planetviewer import SolarSystemBody
 planet = SolarSystemBody('Jupiter')
 ```
 
@@ -93,11 +116,6 @@ for specifics on arguments and outputs.
 Almost every method requires the fundamental arguments `time` (as an Astropy 
 `Time` object) and `observer` (as a string). Other methods have additional 
 arguments detailed in their docstrings.
-
-> **NOTE**<br>
-> These values may differ slightly from those reported by the planet viewers. 
-> They frequently used different aberration correction like `'LT'` while I used 
-> `'LT+S'` following the advice given in the SPICE documentation.
 
 | Method                                    | Description                                                                                                 |
 |:------------------------------------------|:------------------------------------------------------------------------------------------------------------|
@@ -138,12 +156,14 @@ arguments detailed in their docstrings.
 | `draw`                                    | A convenience function to draw a planet in an Astropy `WCSAxes` axis.                                       |
 
 ## Visualization with Matplotlib
-The primary purpose of this package is to provide a convenient way to visualize 
-the appearance of a Solar System object to an observer at a particular time. 
-I imagine most people will use this to generate figures for papers or 
-presentations. Astropy provides a variety of convenient extensions to 
-Matplotlib with produce excellent astronomical graphics, and the methods I've 
-created here are designed to interface with both Astropy's extensions.
+The primary purpose of this package is to provide a convenient way to calculate 
+ephemeris information without resorting to JPL Horizons (which can be slow and 
+inaccurate) and also visualize the appearance of a Solar System object(s) to an 
+observer at a particular time. I imagine most people will use this to generate 
+figures for papers or presentations. Astropy provides a variety of convenient 
+extensions to Matplotlib with produce excellent astronomical graphics, and the 
+methods I've created here are designed to interface with both Astropy's 
+extensions.
 
 `SolarSystemBody` objects can be drawn in parts (using the various functions 
 described below) or using the convenient `draw` method. Rings can be drawn for 
