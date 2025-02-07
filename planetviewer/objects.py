@@ -1630,7 +1630,7 @@ class SolarSystemBody:
             Astropy `Quantity` object.
         """
         et = spice.str2et(time.isot)
-        _, lt = get_light_time(self._name, et, observer)
+        lt = get_light_time(self._name, et, observer)
         return lt * time_unit
 
     def get_apparent_epoch(self,
@@ -1654,7 +1654,7 @@ class SolarSystemBody:
             The apparent epoch at the object as seen by the observer.
         """
         et = spice.str2et(time.isot)
-        epoch, _ = get_light_time(self._name, et, observer, direction='<-')
+        epoch = get_apparent_epoch(self._name, et, observer)
         return Time(spice.et2datetime(epoch), scale='utc')
 
     def get_necessary_epoch(self,
@@ -1680,6 +1680,96 @@ class SolarSystemBody:
         et = spice.str2et(time.isot)
         epoch, _ = get_light_time(self._name, et, observer, direction='->')
         return Time(spice.et2datetime(epoch), scale='utc')
+
+    def get_occultation(self,
+                        other_body_name: str,
+                        time: Time,
+                        observer: str) -> int:
+        """
+        Determine if this body is occulted by another body or vice-versa. The
+        table below details the meaning of the occultation codes.
+
+        +------+----------------------------------------------------------------------------------------------------------+
+        | Code | Meaning                                                                                                  |
+        +======+==========================================================================================================+
+        | -3   | Total occultation of this body by the other body.                                                        |
+        +------+----------------------------------------------------------------------------------------------------------+
+        | -2   | Annular occultation of this body by the other body. The other body does not block the limb of the first. |
+        +------+----------------------------------------------------------------------------------------------------------+
+        | -1   | Partial occultation of this body by the other body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  0   | No occultation or transit: both objects are completely visible to the observer.                          |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  1   | Partial occultation of the other body by this body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  2   | Annular occultation of the other body by this body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  3   | Total occultation of the other body by this body.                                                        |
+        +------+----------------------------------------------------------------------------------------------------------+
+
+        Parameters
+        ----------
+        other_body_name : str
+            The name of the other body.
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        int
+            The occultation code.
+        """
+        et = spice.str2et(time.isot)
+        return determine_occultation(self._name, other_body_name, et, observer)
+
+    def get_eclipsed(self,
+                     other_body_name: str,
+                     time: Time,
+                     observer: str) -> int:
+        """
+        Determine if this body casts a shadow on another body or vice-versa.
+        The table below details the meaning of the occultation codes.
+
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | Code | Meaning                                                                                                                                                    |
+        +======+============================================================================================================================================================+
+        | -3   | Total occultation: this body is fully eclipsed by the other body.                                                                                          |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | -2   | Annular occultation: the other body's full shadow appears on this body's disk but the shadow is smaller than the disk (like when Europa transits Jupiter). |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | -1   | Partial occultation: partial occultation: some portion of the disk and limb of this body is covered by other body's shadow.                                |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  0   | No occultation or transit: neither body casts a shadow onto the other.                                                                                     |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  1   | Partial occultation: this body is casting a shadow which partially covers the disk and limb of the other body.                                             |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  2   | Annular occultation: this body casts a smaller but complete shadow onto the disk of the other body.                                                        |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  3   | Total occultation: this body totally eclipses the other body.                                                                                              |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+        Parameters
+        ----------
+        other_body_name : str
+            The name of the other body.
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        int
+            The occultation code.
+        """
+        et = spice.str2et(time.isot)
+        return determine_if_in_shadow(self._name, other_body_name, et, observer)
 
     def get_latlon_sky_coordinates(self,
                                    time: Time,
@@ -1964,96 +2054,6 @@ class SolarSystemBody:
         distance = self.get_distance(time, observer)
         re = np.mean(get_radii(self._name)[:2])
         return Angle(np.arctan(re * length_unit / distance)).to(u.arcsec)
-
-    def get_occultation(self,
-                        other_body_name: str,
-                        time: Time,
-                        observer: str) -> int:
-        """
-        Determine if this body is occulted by another body. The table below
-        details the meaning of the occultation codes.
-
-        +------+----------------------------------------------------------------------------------------------------------+
-        | Code | Meaning                                                                                                  |
-        +======+==========================================================================================================+
-        | -3   | Total occultation of this body by the other body.                                                        |
-        +------+----------------------------------------------------------------------------------------------------------+
-        | -2   | Annular occultation of this body by the other body. The other body does not block the limb of the first. |
-        +------+----------------------------------------------------------------------------------------------------------+
-        | -1   | Partial occultation of this body by the other body.                                                      |
-        +------+----------------------------------------------------------------------------------------------------------+
-        |  0   | No occultation or transit: both objects are completely visible to the observer.                          |
-        +------+----------------------------------------------------------------------------------------------------------+
-        |  1   | Partial occultation of the other body by this body.                                                      |
-        +------+----------------------------------------------------------------------------------------------------------+
-        |  2   | Annular occultation of the other body by this body.                                                      |
-        +------+----------------------------------------------------------------------------------------------------------+
-        |  3   | Total occultation of the other body by this body.                                                        |
-        +------+----------------------------------------------------------------------------------------------------------+
-
-        Parameters
-        ----------
-        other_body_name : str
-            The name of the other body.
-        time : Time
-            UTC at the time of observation.
-        observer : str
-            The observer or observatory. Could be a Solar System body like
-            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
-            like "Juno".
-
-        Returns
-        -------
-        int
-            The occultation code.
-        """
-        et = spice.str2et(time.isot)
-        return determine_occultation(self._name, other_body_name, et, observer)
-
-    def get_eclipsed(self,
-                     other_body_name: str,
-                     time: Time,
-                     observer: str) -> int:
-        """
-        Determine if this body casts a shadow on another body or vice-versa.
-        The table below details the meaning of the occultation codes.
-
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        | Code | Meaning                                                                                                                                                    |
-        +======+============================================================================================================================================================+
-        | -3   | Total occultation: this body is fully eclipsed by the other body.                                                                                          |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        | -2   | Annular occultation: the other body's full shadow appears on this body's disk but the shadow is smaller than the disk (like when Europa transits Jupiter). |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        | -1   | Partial occultation: partial occultation: some portion of the disk and limb of this body is covered by other body's shadow.                                |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        |  0   | No occultation or transit: neither body casts a shadow onto the other.                                                                                     |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        |  1   | Partial occultation: this body is casting a shadow which partially covers the disk and limb of the other body.                                             |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        |  2   | Annular occultation: this body casts a smaller but complete shadow onto the disk of the other body.                                                        |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-        |  3   | Total occultation: this body totally eclipses the other body.                                                                                              |
-        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-
-        Parameters
-        ----------
-        other_body_name : str
-            The name of the other body.
-        time : Time
-            UTC at the time of observation.
-        observer : str
-            The observer or observatory. Could be a Solar System body like
-            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
-            like "Juno".
-
-        Returns
-        -------
-        int
-            The occultation code.
-        """
-        et = spice.str2et(time.isot)
-        return determine_if_in_shadow(self._name, other_body_name, et, observer)
 
     def _make_ring(self, properties: dict) -> Ring:
         """
@@ -2604,7 +2604,9 @@ def sort_by_distance(names: list[str],
                      observer: str) -> list[str]:
     """
     Convenience function to sort ephemeris objects by their distance from the
-    observer from furthest to closest.
+    observer from furthest to closest. Useful for drawing so that furthest
+    objects are drawn first and will therefore appear behind objects drawn
+    later.
 
     Parameters
     ----------

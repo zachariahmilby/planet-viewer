@@ -117,43 +117,46 @@ Almost every method requires the fundamental arguments `time` (as an Astropy
 `Time` object) and `observer` (as a string). Other methods have additional 
 arguments detailed in their docstrings.
 
-| Method                                    | Description                                                                                                 |
-|:------------------------------------------|:------------------------------------------------------------------------------------------------------------|
-| `get_ra`                                  | Get J2000 right ascension.                                                                                  |
-| `get_dec`                                 | Get J2000 declination.                                                                                      |
-| `get_skycoord`                            | Get J2000 sky coordinate (RA/Dec).                                                                          |
-| `get_offset`                              | Get offset between this object and another `SkyCoord` object.                                               |
-| `get_sub_observer_latitude`               | Get apparent sub-observer latitude on the planet.                                                           |
-| `get_sub_observer_longitude`              | Get apparent sub-observer longitude on the planet.                                                          |
-| `get_subsolar_latitude`                   | Get apparent sub-solar latitude on the planet.                                                              |
-| `get_subsolar_longitude`                  | Get apparent sub-solar longitude on the planet.                                                             |
-| `get_phase_angle`                         | Get the phase angle at the sub-observer point.                                                              |
-| `get_distance`                            | Get the distance from a SPICE ephemeris object to the object's barycenter.                                  |
-| `get_ring_subsolar_latitude`              | Get the sub-solar latitude on the rings (the same as the planet's sub-solar latitude).                      |
-| `get_ring_subsolar_latitude_range`        | Get the range in sub-solar latitude on the rings due to the apparent angular size of the Sun.               |
-| `get_ring_plane_opening_angle`            | Get the ring plane opening angle (the same as the planet's sub-observer latitude).                          |
-| `determine_if_rings_illuminated`          | Determine if the rings appear illuminated to the observer.                                                  |
-| `get_ring_center_phase_angle`             | Get the ring phase angle (the same as the phase angle at the sub-observer point).                           |
-| `get_ascending_node_longitude`            | Get the planetographic longitude of the ascending node of the body's equator on the J2000 frame equator.    |
-| `get_ring_subsolar_longitude`             | Get the sub-solar longitude measured relative to the ring plane ascending node.                             |
-| `get_ring_sub_observer_longitude`         | Get the sub-observer longitude measured relative to the ring plane ascending node.                          |
-| `get_sun_target_distance`                 | Get the distance from the Sun to the object's barycenter.                                                   |
-| `get_observer_target_distance`            | Get the distance from the observer to the object's barycenter.                                              |
-| `get_light_travel_time`                   | Get the light travel time between a SPICE ephemeris object and the object's barycenter.                     |
-| `get_apparent_epoch`                      | Get the apparent epoch at the object as seen by the observer.                                               |
-| `get_necessary_epoch`                     | Get the observer epoch necessary to observe the target at a given epoch.                                    |
-| `get_latlon_sky_coordinates`              | Get the apparent RA/Dec of a latitude/longitude point on the object's surface.                              |
-| `get_longitude_line_coordinates`          | Get the apparent RA/Dec of an entire meridian.                                                              |
-| `get_latitude_line_coordinates`           | Get the apparent RA/Dec of an entire parallel.                                                              |
-| `get_limb_sky_coordinates`                | Get the apparent RA/Dec of an object's limb.                                                                |
-| `get_terminator_sky_coordinates`          | Get the apparent RA/Dec of an object's terminator.                                                          |
-| `get_dayside_sky_coordinates`             | Get the apaprent RA/Dec of an object's dayside disk (the region between the dayside limb and terminator).   |
-| `get_shadow_intersection_sky_coordinates` | Get the apparent RA/Dec of the intersection of another object's shadow on the apparent disk of this object. |
-| `get_angular_radius`                      | Convert the object's mean equatorial radius to angular radius on the sky.                                   |
-| `get_angular_offset_between_times`        | Calculate the RA/Dec offset necessary to shift this object's sky coordinates between two times.             |
-| `parse_fov`                               | Convert an angle, length or scalar to an angular field-of-view.                                             |
-| `check_for_shadows`                       | Determine if a body casts a shadow on another body or vice-versa.                                           |
-| `draw`                                    | A convenience function to draw a planet in an Astropy `WCSAxes` axis.                                       |
+| Method                                     | Description                                                                                                 |
+|:-------------------------------------------|:------------------------------------------------------------------------------------------------------------|
+| `get_ra`                                   | Get J2000 right ascension.                                                                                  |
+| `get_dec`                                  | Get J2000 declination.                                                                                      |
+| `get_skycoord`                             | Get J2000 sky coordinate (RA/Dec).                                                                          |
+| `get_offset`                               | Get offset between this object and another `SkyCoord` object.                                               |
+| `get_sub_observer_latitude`                | Get apparent sub-observer latitude on the planet.                                                           |
+| `get_sub_observer_longitude`               | Get apparent sub-observer longitude on the planet.                                                          |
+| `get_subsolar_latitude`                    | Get apparent sub-solar latitude on the planet.                                                              |
+| `get_subsolar_longitude`                   | Get apparent sub-solar longitude on the planet.                                                             |
+| `get_phase_angle`                          | Get the phase angle at the sub-observer point.                                                              |
+| `get_distance`                             | Get the distance from a SPICE ephemeris object to the object's barycenter.                                  |
+| `get_relative_velocity`                    | Get the relative velocity of the object.                                                                    |
+| `get_ring_subsolar_latitude`               | Get the sub-solar latitude on the rings (the same as the planet's sub-solar latitude).                      |
+| `get_ring_subsolar_latitude_range`         | Get the range in sub-solar latitude on the rings due to the apparent angular size of the Sun.               |
+| `get_ring_plane_opening_angle`             | Get the ring plane opening angle (the same as the planet's sub-observer latitude).                          |
+| `determine_if_rings_illuminated`           | Determine if the rings appear illuminated to the observer.                                                  |
+| `get_ring_center_phase_angle`              | Get the ring phase angle (the same as the phase angle at the sub-observer point).                           |
+| `get_ascending_node_longitude`             | Get the planetographic longitude of the ascending node of the body's equator on the J2000 frame equator.    |
+| `get_ring_subsolar_longitude`              | Get the sub-solar longitude measured relative to the ring plane ascending node.                             |
+| `get_ring_sub_observer_longitude`          | Get the sub-observer longitude measured relative to the ring plane ascending node.                          |
+| `get_sun_target_distance`                  | Get the distance from the Sun to the object's barycenter.                                                   |
+| `get_observer_target_distance`             | Get the distance from the observer to the object's barycenter.                                              |
+| `get_light_travel_time`                    | Get the light travel time between a SPICE ephemeris object and the object's barycenter.                     |
+| `get_apparent_epoch`                       | Get the apparent epoch at the object as seen by the observer.                                               |
+| `get_necessary_epoch`                      | Get the observer epoch necessary to observe the target at a given epoch.                                    |
+| `get_occultation`                          | Determine if this object is occulted by another object or vice-versa.                                       |
+| `get_eclipsed`                             | Determine if this body casts a shadow on another body or vice-versa.                                        |
+| `get_latlon_sky_coordinates`               | Get the apparent RA/Dec of a latitude/longitude point on the object's surface.                              |
+| `get_longitude_line_coordinates`           | Get the apparent RA/Dec of an entire meridian.                                                              |
+| `get_latitude_line_coordinates`            | Get the apparent RA/Dec of an entire parallel.                                                              |
+| `get_limb_sky_coordinates`                 | Get the apparent RA/Dec of an object's limb.                                                                |
+| `get_terminator_sky_coordinates`           | Get the apparent RA/Dec of an object's terminator.                                                          |
+| `get_dayside_sky_coordinates`              | Get the apaprent RA/Dec of an object's dayside disk (the region between the dayside limb and terminator).   |
+| `get_shadow_intersection_sky_coordinates`  | Get the apparent RA/Dec of the intersection of another object's shadow on the apparent disk of this object. |
+| `get_angular_radius`                       | Convert the object's mean equatorial radius to angular radius on the sky.                                   |
+| `get_angular_offset_between_times`         | Calculate the RA/Dec offset necessary to shift this object's sky coordinates between two times.             |
+| `parse_fov`                                | Convert an angle, length or scalar to an angular field-of-view.                                             |
+| `check_for_shadows`                        | Determine if a body casts a shadow on another body or vice-versa.                                           |
+| `draw`                                     | A convenience function to draw a planet in an Astropy `WCSAxes` axis.                                       |
 
 ## Visualization with Matplotlib
 The primary purpose of this package is to provide a convenient way to calculate 
