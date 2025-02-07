@@ -12,11 +12,6 @@ from planetviewer.plotting import (make_wcs,
                                    plot_arc,
                                    place_label,
                                    standard_colors)
-from planetviewer.spice_functions import (abcorr,
-                                          ref,
-                                          subpoint_method,
-                                          surface_method,
-                                          corloc)
 from planetviewer.spice_kernels import (set_kernel_path,
                                         download_spice_kernels,
                                         furnish_spice_kernels,
