@@ -4,25 +4,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import spiceypy
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord, Latitude, Longitude
 from astropy.time import Time
 from astropy.visualization.wcsaxes.core import WCSAxes
-from spiceypy.utils.exceptions import NotFoundError
 
 from planetviewer.files import _project_directory
 from planetviewer.plotting import (
     plot_limb, plot_disk, plot_nightside, plot_latlon, plot_ring, plot_arc,
-    place_ring_pericenter_markers, plot_primary_shadow,
-    _default_night_patch_kwargs)
-from planetviewer.spice_functions import (
-    determine_prograde_rotation, get_radii, get_sky_coordinates, angle_unit,
-    get_sub_observer_latlon, get_sub_solar_latlon,
-    get_sub_observer_phase_angle, get_state, length_unit, get_light_time,
-    get_et, get_limb_radec, get_latlon_radec, get_terminator_radec,
-    get_rotation_rate, abcorr, ref, angle_rate_unit,
-    determine_eclipse_or_transit, get_shadow_intercept, get_dayside_radec)
+    place_ring_pericenter_markers, _default_night_patch_kwargs)
+from planetviewer.spice_functions import *
 
 
 def _r(semimajor_axis: u.Quantity,
@@ -133,7 +124,7 @@ def _ring_xyz(time: Time,
     else:
         a = semimajor_axis
 
-    et = get_et(time)
+    et = spice.str2et(time.isot)
     light_travel_time = get_light_time(planet, et, observer)
     delta_t = (et - light_travel_time) * u.s
     prograde = determine_prograde_rotation(planet)
@@ -171,8 +162,8 @@ def _ring_xyz(time: Time,
     if not pericenter:
         if boundaries:
             theta = np.arange(
-                minlon.to(u.degree).value-step.value/2,
-                (minlon + delta_lon).to(u.degree).value+step.value/2,
+                minlon.to(u.degree).value - step.value / 2,
+                (minlon + delta_lon).to(u.degree).value + step.value / 2,
                 step.value) * u.degree
         else:
             theta = np.arange(minlon.to(u.degree).value,
@@ -205,6 +196,101 @@ def _ring_xyz(time: Time,
         return np.array([x]), np.array([y]), np.array([z])
     else:
         return x, y, z
+    
+    
+def _convert_to_sky_coords(time: Time,
+                           radec_func,
+                           **kwargs) -> list[SkyCoord]:
+    """
+    Convenience function to calculate RA/Dec with one of the SPICE
+    functions and convert to SkyCoord objects.
+
+    Parameters
+    ----------
+    time : Time
+        UTC at the time of observation.
+    radec_func
+        The function which returns RA and Dec in units of [rad].
+    **kwargs
+        The arguments to `radec_func` with the exception of `et` which is
+        calculated internally.
+
+    Returns
+    -------
+    list[SkyCoord]
+        The coordinates as a list of Astropy `SkyCoord` objects.
+    """
+    et = spice.str2et(time.isot)
+    ras, decs = radec_func(et=et, **kwargs)
+    coordinates = []
+    for ra, dec in zip(ras, decs):
+        coordinates.append(
+            SkyCoord(ra=ra * angle_unit, dec=dec * angle_unit))
+    return coordinates
+
+
+def _parse_unit(value: int | float,
+                unit: u.Unit) -> u.Quantity:
+    """
+    Replace NaN values with zero.
+
+    Parameters
+    ----------
+    value : int | float
+        The quantity's value.
+    unit : u.Unit
+        The quantity's unit.
+
+    Returns
+    -------
+    u.Quantity
+        The parsed quantity as an Astropy `Quantity` object.
+    """
+    if np.isnan(value):
+        return 0.0 * unit
+    else:
+        return value * unit
+
+
+def _add_units_to_ring_props(properties: dict) -> dict:
+    """
+    Add units to ring orbital elements.
+
+    Parameters
+    ----------
+    properties : dict
+        A dictionary of the ring orbital elements.
+
+    Returns
+    -------
+    dict
+        A dictionary like the input dictionary but now with units.
+    """
+    lengths = ['semimajor_axis', 'width']
+    for i in lengths:
+        properties[i] = _parse_unit(properties[i], u.km)
+
+    angles = ['inclination', 'longitude_of_periapsis',
+              'longitude_of_ascending_node', 'longitude_offset']
+    for i in angles:
+        properties[i] = _parse_unit(properties[i], u.degree)
+
+    angular_rates = ['dlon_dt', 'dnode_dt']
+    for i in angular_rates:
+        properties[i] = _parse_unit(
+            properties[i], u.degree / u.day).to(u.degree / u.s)
+
+    properties['epoch'] = Time(properties['epoch'], scale='utc')
+
+    if np.isnan(properties['eccentricity']):
+        properties['eccentricity'] = 0.0
+
+    for arc in properties['arcs']:
+        arc['min_longitude'] = _parse_unit(arc['min_longitude'], u.degree)
+        arc['max_longitude'] = _parse_unit(arc['max_longitude'], u.degree)
+        arc['dlon_dt'] = _parse_unit(arc['dlon_dt'], u.degree / u.day)
+
+    return properties
 
 
 class Arc:
@@ -213,6 +299,7 @@ class Arc:
     Assumes provided parameters have been measured at the same epoch as the
     parent ring.
     """
+
     def __init__(self,
                  name: str,
                  min_longitude: u.Quantity,
@@ -264,6 +351,7 @@ class Ring:
     to the J2000 reference time of 2000-01-01 12:00 UT at the parent body (not
     the observer).
     """
+
     def __init__(self,
                  name: str,
                  planet: str,
@@ -308,7 +396,7 @@ class Ring:
         """
         self._name = name
         self._planet = planet
-        self._fixref = f'IAU_{planet}'
+        self._fixref = get_target_frame(planet)
         self._planet_prograde = planet_prograde
         self._semimajor_axis = semimajor_axis
         self._width = width
@@ -439,7 +527,7 @@ class Ring:
             A list containing the ring sky coordinates as Astropy `SkyCoord`
             objects.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         args = dict(time=time,
                     observer=observer,
                     step=step,
@@ -461,13 +549,13 @@ class Ring:
                       abcorr=abcorr,
                       obsrvr=observer)
         for i in range(x.size):
-            spoint = spiceypy.vpack(float(x[i]), float(y[i]), float(z[i]))
-            trgepc, vec, _, _, _, visible, lit = spiceypy.illumf(
+            spoint = spice.vpack(float(x[i]), float(y[i]), float(z[i]))
+            trgepc, vec, _, _, _, visible, lit = spice.illumf(
                 spoint=spoint, **params)
-            rotation_matrix = spiceypy.pxfrm2(
+            rotation_matrix = spice.pxfrm2(
                 self._fixref, 'J2000', trgepc, et)
-            point = spiceypy.mxv(rotation_matrix, vec)
-            _, ra_i, dec_i = spiceypy.recrad(point)
+            point = spice.mxv(rotation_matrix, vec)
+            _, ra_i, dec_i = spice.recrad(point)
             coord = SkyCoord(ra=Angle(ra_i, unit='rad'),
                              dec=Angle(dec_i, unit='rad'))
             coords.append(coord)
@@ -521,7 +609,7 @@ class Ring:
             An array of distances from the observer to each ring segment as an
             Astropy `Quantity` object.
         """
-        et = spiceypy.str2et(time.to_string())
+        et = spice.str2et(time.to_string())
         args = dict(time=time,
                     observer=observer,
                     step=step,
@@ -536,28 +624,28 @@ class Ring:
             return None
         distances = np.full(x.shape, np.nan)
         for i in range(x.size):
-
             # get distance from observer to parent body in J2000
-            starg, lt = spiceypy.spkezr(self._planet, et, ref, abcorr,
+            starg, lt = spice.spkezr(self._planet, et, ref, abcorr,
                                         observer)
             vec2 = starg[:3]
 
             # convert vector to J2000
-            rotate = spiceypy.pxform(self._fixref, ref, et-lt)
-            vec1 = spiceypy.vpack(float(x[i]), float(y[i]), float(z[i]))
-            vec1 = spiceypy.mxv(rotate, vec1)
+            rotate = spice.pxform(self._fixref, ref, et - lt)
+            vec1 = spice.vpack(float(x[i]), float(y[i]), float(z[i]))
+            vec1 = spice.mxv(rotate, vec1)
 
             # add vectors to get distance from observer to ring point
             dist_vec = vec1 + vec2
 
             # calculate magnitude of distance vector
-            distances[i] = spiceypy.vnorm(dist_vec)
+            distances[i] = spice.vnorm(dist_vec)
 
         return distances * length_unit
 
     # noinspection DuplicatedCode
     def _determine_eclipsed(self,
                             time: Time,
+                            observer: str = 'Sun',
                             step: u.Quantity = 1 * u.degree,
                             edge: str = None,
                             pericenter: bool = False,
@@ -573,6 +661,13 @@ class Ring:
         ----------
         time : Time
             UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno". Default is 'Sun' assuming you want to know where the
+            ring is in shadow behind the planet, but this could easily be
+            changed to something else to see what parts of a ring are not
+            visible for a specific observer.
         step : u.Quantity
             Angular precision of the calculation. Default is 1 degree.
         pericenter : bool
@@ -599,8 +694,7 @@ class Ring:
             A boolean array indicating whether a ring segment is eclipsed or 
             not. `True` means it is eclipsed. `False` means it is lit.
         """
-        observer = 'Sun'
-        et = spiceypy.str2et(time.to_string())
+        et = spice.str2et(time.to_string())
         args = dict(time=time,
                     observer=observer,
                     step=step,
@@ -610,8 +704,8 @@ class Ring:
                     dminlon_dt=dminlon_dt,
                     delta_lon=delta_lon,
                     boundaries=boundaries)
-        starg, lt = spiceypy.spkezr(self._planet, et, ref, abcorr, observer)
-        parent_distance = spiceypy.vnorm(starg[:3]) * length_unit
+        starg, lt = spice.spkezr(self._planet, et, ref, abcorr, observer)
+        parent_distance = spice.vnorm(starg[:3]) * length_unit
         distances = self._get_distances(**args)
         x, y, z = self._get_xyz(**args)
         shaded = np.full(distances.shape, False, dtype=bool)
@@ -626,14 +720,14 @@ class Ring:
             if distances[i] < parent_distance:
                 continue
             else:
-                spoint = spiceypy.vpack(float(x[i]), float(y[i]), float(z[i]))
-                trgepc, vec, _, _, _, _, _ = spiceypy.illumf(
+                spoint = spice.vpack(float(x[i]), float(y[i]), float(z[i]))
+                trgepc, vec, _, _, _, _, _ = spice.illumf(
                     spoint=spoint, **params)
-                rotation_matrix = spiceypy.pxfrm2(self._fixref, 'J2000',
+                rotation_matrix = spice.pxfrm2(self._fixref, 'J2000',
                                                   trgepc, et)
-                rotvec = spiceypy.mxv(rotation_matrix, vec)
+                rotvec = spice.mxv(rotation_matrix, vec)
                 try:
-                    spiceypy.sincpt('ELLIPSOID', self._planet, et,
+                    spice.sincpt('ELLIPSOID', self._planet, et,
                                     self._fixref, abcorr, observer, 'J2000',
                                     rotvec)
                 except NotFoundError:
@@ -751,7 +845,7 @@ class Ring:
         Returns
         -------
         np.ndarray
-            A boolean array indicating whether a ring segment is eclipsed or 
+            A boolean array indicating whether a ring segment is eclipsed or
             not. `True` means it is eclipsed. `False` means it is lit.
         """
         args = dict(time=time,
@@ -905,6 +999,7 @@ class SolarSystemBody:
     """
     A Solar System object like a major planet, a minor planet or a satellite.
     """
+
     def __init__(self, name: str):
         """
         Parameters
@@ -913,9 +1008,9 @@ class SolarSystemBody:
             The name of the Solar System object. Must be available in SPICE.
         """
         self._name = name
-        self._code = spiceypy.bodn2c(name)
+        self._code = spice.bodn2c(name)
         self._prograde = determine_prograde_rotation(name)
-        self._fixref = f'IAU_{name}'
+        self._fixref = get_target_frame(name)
         self._rings = self._get_rings()
 
     def get_ra(self,
@@ -943,7 +1038,7 @@ class SolarSystemBody:
         str | Angle
             The RA as either a string or Astropy `Angle` object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         ra, _ = get_sky_coordinates(self._name, et, observer)
         ra = Angle(ra * angle_unit)
         if string:
@@ -976,7 +1071,7 @@ class SolarSystemBody:
         str | Angle
             The declination as either a string or Astropy `Angle` object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         _, dec = get_sky_coordinates(self._name, et, observer)
         dec = Angle(dec * angle_unit)
         if string:
@@ -1005,9 +1100,9 @@ class SolarSystemBody:
         SkyCoord
             The sky coordinates as an Astropy `SkyCoord` object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         ra, dec = get_sky_coordinates(self._name, et, observer)
-        return SkyCoord(ra=ra*angle_unit, dec=dec*angle_unit)
+        return SkyCoord(ra=ra * angle_unit, dec=dec * angle_unit)
 
     def get_offset(self,
                    time: Time,
@@ -1031,8 +1126,8 @@ class SolarSystemBody:
         Returns
         -------
         tuple[Angle, Angle]
-            The spherical offset between this body and a reference body as 
-            Astropy `Angle` objects in units of arcseconds. If `refcoord` is 
+            The spherical offset between this body and a reference body as
+            Astropy `Angle` objects in units of arcseconds. If `refcoord` is
             not provided, then the returned offset will be (0, 0).
         """
         if refcoord is None:
@@ -1063,7 +1158,7 @@ class SolarSystemBody:
             The sub-observer planetographic latitude as an Astropy `Latitude`
             object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         lat, _ = get_sub_observer_latlon(self._name, et, observer)
         return Latitude(lat * angle_unit).to(u.degree)
 
@@ -1089,7 +1184,7 @@ class SolarSystemBody:
             The sub-observer planetographic latitude as an Astropy `Longitude`
             object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         _, lon = get_sub_observer_latlon(self._name, et, observer)
         return Longitude(lon * angle_unit).to(u.degree)
 
@@ -1115,7 +1210,7 @@ class SolarSystemBody:
             The sub-observer planetographic latitude as an Astropy `Latitude`
             object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         lat, _ = get_sub_solar_latlon(self._name, et, observer)
         return Latitude(lat * angle_unit).to(u.degree)
 
@@ -1141,7 +1236,7 @@ class SolarSystemBody:
             The sub-observer planetographic latitude as an Astropy `Longitude`
             object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         _, lon = get_sub_solar_latlon(self._name, et, observer)
         return Longitude(lon * angle_unit).to(u.degree)
 
@@ -1164,10 +1259,10 @@ class SolarSystemBody:
         Returns
         -------
         Angle
-            The phase angle at the sub-observer point as an Astropy `Angle` 
+            The phase angle at the sub-observer point as an Astropy `Angle`
             object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         phase = get_sub_observer_phase_angle(self._name, et, observer)
         return Angle(phase * angle_unit).to(u.degree)
 
@@ -1192,9 +1287,37 @@ class SolarSystemBody:
         u.Quantity
             The distance to the object as an Astropy `Quantity` object.
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         vec = get_state(self._name, et, observer)
-        return spiceypy.vnorm(vec) * length_unit
+        return spice.vnorm(vec[:3]) * length_unit
+    
+    def get_relative_velocity(self,
+                              time: Time,
+                              observer: str) -> u.Quantity:
+        """
+        Get the relative velocity of the object for a given UTC time and
+        observer/observatory.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        u.Quantity
+            The relative velocity of the object as an Astropy `Quantity` 
+            object.
+        """
+        et = spice.str2et(time.isot)
+        vec0 = get_state(self._name, et-0.5, observer)
+        vec1 = get_state(self._name, et+0.5, observer)
+        diff = spice.vnorm(vec1[:3]) - spice.vnorm(vec0[:3])
+        return diff * length_unit / time_unit
 
     def get_ring_subsolar_latitude(self,
                                    time: Time,
@@ -1240,11 +1363,11 @@ class SolarSystemBody:
         tuple[Latitude, Latitude]
             The range in sub-solar latitude.
         """
-        _, radii = spiceypy.bodvcd(10, 'RADII', 3)
-        et = get_et(time)
+        _, radii = spice.bodvcd(10, 'RADII', 3)
+        et = spice.str2et(time.isot)
         vec = get_state(self._name, et, 'Sun')
         angular_radius = Angle(
-            radii[0] / spiceypy.vnorm(vec), unit=u.rad).to(u.degree)
+            radii[0] / spice.vnorm(vec), unit=u.rad).to(u.degree)
         lat0 = self.get_ring_subsolar_latitude(time, observer)
         return Latitude(lat0 - angular_radius), Latitude(lat0 + angular_radius)
 
@@ -1345,20 +1468,20 @@ class SolarSystemBody:
             The planetographic longitude of the ring plane ascending node as an
             Astropy `Longitude` object.
         """
-        et = get_et(time)
-        ra, _, _, _ = spiceypy.bodeul(self._code, et)
+        et = spice.str2et(time.isot)
+        ra, _, _, _ = spice.bodeul(self._code, et)
         if not self._prograde:
-            ra = (ra + spiceypy.pi()) % spiceypy.twopi()
+            ra = (ra + spice.pi()) % spice.twopi()
         offset = Angle(90, unit='deg').rad
         node_vector = np.array([np.cos(ra + offset), np.sin(ra + offset), 0])
         radii = get_radii(self._name)
         re = float(radii[0])
         rp = float(radii[2])
-        f = (re - rp)/re
+        f = (re - rp) / re
         node_vector *= re
-        rotation = spiceypy.pxform('J2000', self._fixref, et)
-        node_vector = spiceypy.mxv(rotation, node_vector)
-        reflon, _, _ = spiceypy.recgeo(node_vector, re, f)
+        rotation = spice.pxform('J2000', self._fixref, et)
+        node_vector = spice.mxv(rotation, node_vector)
+        reflon, _, _ = spice.recgeo(node_vector, re, f)
         return Longitude(reflon * u.rad).to(u.degree)
 
     def _get_ring_sub_longitude(self,
@@ -1445,8 +1568,7 @@ class SolarSystemBody:
         return self._get_ring_sub_longitude(time, observer, 'observer')
 
     def get_sun_target_distance(self,
-                                time: Time,
-                                unit: u.Unit = u.au) -> u.Quantity:
+                                time: Time) -> u.Quantity:
         """
         Get the distance between the target and the Sun.
 
@@ -1454,8 +1576,6 @@ class SolarSystemBody:
         ----------
         time : Time
             UTC at the time of observation.
-        unit : u.Unit
-            Unit of output distance. Default is "au".
 
         Returns
         -------
@@ -1463,7 +1583,7 @@ class SolarSystemBody:
             The distance between the Sun and the target as an Astropy
             `Quantity` object.
         """
-        return self.get_distance(time, 'Sun').to(unit)
+        return self.get_distance(time, 'Sun').to(u.au)
 
     def get_observer_target_distance(self,
                                      time: Time,
@@ -1509,8 +1629,57 @@ class SolarSystemBody:
             The light travel time between the observer and the target as an
             Astropy `Quantity` object.
         """
-        et = get_et(time)
-        return get_light_time(self._name, et, observer) * u.s
+        et = spice.str2et(time.isot)
+        _, lt = get_light_time(self._name, et, observer)
+        return lt * time_unit
+
+    def get_apparent_epoch(self,
+                           time: Time,
+                           observer: str) -> Time:
+        """
+        Get the apparent epoch of the object as seen by the observer.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        Time
+            The apparent epoch at the object as seen by the observer.
+        """
+        et = spice.str2et(time.isot)
+        epoch, _ = get_light_time(self._name, et, observer, direction='<-')
+        return Time(spice.et2datetime(epoch), scale='utc')
+
+    def get_necessary_epoch(self,
+                            time: Time,
+                            observer: str) -> Time:
+        """
+        Get the necessary observer epoch to see an object at a specified time.
+
+        Parameters
+        ----------
+        time : Time
+            UTC time local to the object.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        Time
+            The observer epoch at which you can view the object at `time`.
+        """
+        et = spice.str2et(time.isot)
+        epoch, _ = get_light_time(self._name, et, observer, direction='->')
+        return Time(spice.et2datetime(epoch), scale='utc')
 
     def get_latlon_sky_coordinates(self,
                                    time: Time,
@@ -1540,12 +1709,12 @@ class SolarSystemBody:
             The right ascension and declination of the latitude/longitude point
             as an Astropy `SkyCoord` object.'
         """
-        et = get_et(time)
+        et = spice.str2et(time.isot)
         latitude = latitude.to(u.rad).value
         longitude = longitude.to(u.rad).value
         ra, dec = get_latlon_radec(
             self._name, et, observer, latitude, longitude)
-        return SkyCoord(ra=Angle(ra*angle_unit), dec=Angle(dec*angle_unit))
+        return SkyCoord(ra=Angle(ra * angle_unit), dec=Angle(dec * angle_unit))
 
     def get_longitude_line_coordinates(self,
                                        time: Time,
@@ -1576,7 +1745,7 @@ class SolarSystemBody:
             The right ascension and declination of the longitude line as a list
             of Astropy `SkyCoord` objects.'
         """
-        latitudes = np.linspace(-90, 90, int(180/dlat.value) + 1) * u.degree
+        latitudes = np.linspace(-90, 90, int(180 / dlat.value) + 1) * u.degree
         coords = []
         for latitude in latitudes:
             coords.append(self.get_latlon_sky_coordinates(time, observer,
@@ -1612,43 +1781,13 @@ class SolarSystemBody:
             The right ascension and declination of the latitude line as a list
             of Astropy `SkyCoord` objects.'
         """
-        longitudes = np.linspace(-180, 180, int(360/dlon.value) + 1) * u.degree
+        longitudes = np.linspace(-180, 180,
+                                 int(360 / dlon.value) + 1) * u.degree
         coords = []
         for longitude in longitudes:
             coords.append(self.get_latlon_sky_coordinates(time, observer,
                                                           latitude, longitude))
         return coords
-
-    @staticmethod
-    def _convert_to_sky_coords(time: Time,
-                               radec_func,
-                               **kwargs) -> list[SkyCoord]:
-        """
-        Convenience function to calculate RA/Dec with one of the SPICE
-        functions and convert to SkyCoord objects.
-
-        Parameters
-        ----------
-        time : Time
-            UTC at the time of observation.
-        radec_func
-            The function which returns RA and Dec in units of [rad].
-        **kwargs
-            The arguments to `radec_func` with the exception of `et` which is
-            calculated internally.
-
-        Returns
-        -------
-        list[SkyCoord]
-            The coordinates as a list of Astropy `SkyCoord` objects.
-        """
-        et = get_et(time)
-        ras, decs = radec_func(et=et, **kwargs)
-        coordinates = []
-        for ra, dec in zip(ras, decs):
-            coordinates.append(
-                SkyCoord(ra=ra * angle_unit, dec=dec * angle_unit))
-        return coordinates
 
     def get_limb_sky_coordinates(self,
                                  time: Time,
@@ -1682,7 +1821,7 @@ class SolarSystemBody:
                       target=self._name,
                       obs=observer,
                       resolution=resolution)
-        return self._convert_to_sky_coords(**kwargs)
+        return _convert_to_sky_coords(**kwargs)
 
     def get_terminator_sky_coordinates(
             self,
@@ -1722,7 +1861,7 @@ class SolarSystemBody:
                       obs=observer,
                       resolution=resolution,
                       kind=kind)
-        return self._convert_to_sky_coords(**kwargs)
+        return _convert_to_sky_coords(**kwargs)
 
     def get_dayside_sky_coordinates(self,
                                     time: Time,
@@ -1756,7 +1895,7 @@ class SolarSystemBody:
                       target=self._name,
                       obs=observer,
                       resolution=resolution)
-        return self._convert_to_sky_coords(**kwargs)
+        return _convert_to_sky_coords(**kwargs)
 
     def get_shadow_intersection_sky_coordinates(
             self,
@@ -1789,13 +1928,17 @@ class SolarSystemBody:
             The right ascension and declination of the body's apparent dayside
             disk as a list of Astropy `SkyCoord` objects.'
         """
+        scale = np.max(
+            [1, get_radii(shadow_casting_body)[0] / get_radii(self._name)[0]])
+
         kwargs = dict(time=time,
                       radec_func=get_shadow_intercept,
                       target1=self._name,
                       target2=shadow_casting_body,
                       obs=observer,
-                      resolution=resolution)
-        return self._convert_to_sky_coords(**kwargs)
+                      resolution=resolution,
+                      scale=scale)
+        return _convert_to_sky_coords(**kwargs)
 
     def get_angular_radius(self,
                            time: Time,
@@ -1822,75 +1965,100 @@ class SolarSystemBody:
         re = np.mean(get_radii(self._name)[:2])
         return Angle(np.arctan(re * length_unit / distance)).to(u.arcsec)
 
-    @staticmethod
-    def _parse_unit(value: int | float,
-                    unit: u.Unit) -> u.Quantity:
+    def get_occultation(self,
+                        other_body: str,
+                        time: Time,
+                        observer: str) -> int:
         """
-        Replace NaN values with zero.
+        Determine if this body is occulted by another body. The table below
+        details the meaning of the occultation codes.
+
+        +------+----------------------------------------------------------------------------------------------------------+
+        | Code | Meaning                                                                                                  |
+        +======+==========================================================================================================+
+        | -3   | Total occultation of this body by the other body.                                                        |
+        +------+----------------------------------------------------------------------------------------------------------+
+        | -2   | Annular occultation of this body by the other body. The other body does not block the limb of the first. |
+        +------+----------------------------------------------------------------------------------------------------------+
+        | -1   | Partial occultation of this body by the other body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  0   | No occultation or transit: both objects are completely visible to the observer.                          |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  1   | Partial occultation of the other body by this body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  2   | Annular occultation of the other body by this body.                                                      |
+        +------+----------------------------------------------------------------------------------------------------------+
+        |  3   | Total occultation of the other body by this body.                                                        |
+        +------+----------------------------------------------------------------------------------------------------------+
 
         Parameters
         ----------
-        value : int | float
-            The quantity's value.
-        unit : u.Unit
-            The quantity's unit.
+        other_body : str
+            The name of the other body.
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
 
         Returns
         -------
-        u.Quantity
-            The parsed quantity as an Astropy `Quantity` object.
+        int
+            The occultation code.
         """
-        if np.isnan(value):
-            return 0.0 * unit
-        else:
-            return value * unit
+        et = spice.str2et(time.isot)
+        return determine_occultation(self._name, other_body, et, observer)
 
-    def _add_units_to_ring_props(self, properties: dict) -> dict:
+    def get_eclipsed(self,
+                     other_body: str,
+                     time: Time,
+                     observer: str) -> int:
         """
-        Add units to ring orbital elements.
-        
+        Determine if this body casts a shadow on another body or vice-versa.
+        The table below details the meaning of the occultation codes.
+
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | Code | Meaning                                                                                                                                                    |
+        +======+============================================================================================================================================================+
+        | -3   | Total occultation: this body is fully eclipsed by the other body.                                                                                          |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | -2   | Annular occultation: the other body's full shadow appears on this body's disk but the shadow is smaller than the disk (like when Europa transits Jupiter). |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        | -1   | Partial occultation: partial occultation: some portion of the disk and limb of this body is covered by other body's shadow.                                |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  0   | No occultation or transit: neither body casts a shadow onto the other.                                                                                     |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  1   | Partial occultation: this body is casting a shadow which partially covers the disk and limb of the other body.                                             |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  2   | Annular occultation: this body casts a smaller but complete shadow onto the disk of the other body.                                                        |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+        |  3   | Total occultation: this body totally eclipses the other body.                                                                                              |
+        +------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
         Parameters
         ----------
-        properties : dict
-            A dictionary of the ring orbital elements.
+        other_body : str
+            The name of the other body.
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
 
         Returns
         -------
-        dict
-            A dictionary like the input dictionary but now with units.
+        int
+            The occultation code.
         """
-        lengths = ['semimajor_axis', 'width']
-        for i in lengths:
-            properties[i] = self._parse_unit(properties[i], u.km)
-
-        angles = ['inclination', 'longitude_of_periapsis',
-                  'longitude_of_ascending_node', 'longitude_offset']
-        for i in angles:
-            properties[i] = self._parse_unit(properties[i], u.degree)
-
-        angular_rates = ['dlon_dt', 'dnode_dt']
-        for i in angular_rates:
-            properties[i] = self._parse_unit(
-                properties[i], u.degree/u.day).to(u.degree/u.s)
-
-        properties['epoch'] = Time(properties['epoch'], scale='utc')
-
-        if np.isnan(properties['eccentricity']):
-            properties['eccentricity'] = 0.0
-
-        for arc in properties['arcs']:
-            arc['min_longitude'] = self._parse_unit(arc['min_longitude'],
-                                                    u.degree)
-            arc['max_longitude'] = self._parse_unit(arc['max_longitude'],
-                                                    u.degree)
-            arc['dlon_dt'] = self._parse_unit(arc['dlon_dt'], u.degree/u.day)
-
-        return properties
+        et = spice.str2et(time.isot)
+        return determine_if_in_shadow(self._name, other_body, et, observer)
 
     def _make_ring(self, properties: dict) -> Ring:
         """
         Convenience function to create `Ring` objects.
-        
+
         Parameters
         ----------
         properties : dict
@@ -1903,7 +2071,7 @@ class SolarSystemBody:
         """
         ascending_node = self.get_ascending_node_longitude(properties['epoch'])
         offset = properties['longitude_offset']
-        dt = get_et(properties['epoch']) * u.s
+        dt = spice.str2et(properties['epoch'].isot) * u.s
         parent_rate = get_rotation_rate(self._name) * angle_rate_unit
         if self._prograde:
             scale = -1
@@ -1952,7 +2120,7 @@ class SolarSystemBody:
     def _get_rings(self) -> dict[str, Ring]:
         """
         A convenience function to generate all rings for a given parent body.
-        
+
         Returns
         -------
         dict[str, Ring]
@@ -1993,8 +2161,7 @@ class SolarSystemBody:
                 ring_properties['arcs'] = arcs
 
                 # add units
-                ring_properties = self._add_units_to_ring_props(
-                    ring_properties)
+                ring_properties = _add_units_to_ring_props(ring_properties)
                 rings[f"{ring_properties['name']}"] = (
                     self._make_ring(ring_properties))
 
@@ -2070,7 +2237,7 @@ class SolarSystemBody:
         else:
             try:
                 fov = fov.to(length_unit)
-                fov = Angle(np.arctan(fov/distance))
+                fov = Angle(np.arctan(fov / distance))
             except u.UnitConversionError:
                 fov = Angle(fov)
         return fov.to(u.arcsec)
@@ -2081,7 +2248,7 @@ class SolarSystemBody:
         Determine if a thing is a list of strings or a string. Helps account
         for people who supply single ring names as a string rather than a list
         with one item.
-        
+
         Parameters
         ----------
         thing : list[str] | str
@@ -2103,9 +2270,9 @@ class SolarSystemBody:
             time: Time,
             observer: str) -> tuple[SkyCoord, u.Quantity] | tuple[None, None]:
         """
-        Convenience function to get the coordinate of and distance to the 
+        Convenience function to get the coordinate of and distance to the
         ring's pericenter. Applies only to some of Uranus's rings.
-         
+
         Parameters
         ----------
         ring : Ring
@@ -2136,10 +2303,13 @@ class SolarSystemBody:
                              time: Time,
                              observer: str,
                              side: str,
+                             lit: bool,
                              dra: Angle,
                              ddec: Angle,
                              rings: list[str] | None,
-                             arcs: list[str] | None) -> None:
+                             arcs: list[str] | None,
+                             pericenter_markers: bool = False,
+                             **kwargs) -> None:
         """
         Since the rings have to be plotted twice (front half and back half),
         this combines all of the plotting logic into a single function.
@@ -2157,6 +2327,10 @@ class SolarSystemBody:
         side : str
             The side of the rings to plot, either 'front' or 'back'. You'll
             want to plot the back first, then plot the planet, then the front.
+        lit : bool
+            Whether or not the rings appear lit to the observer. Can be found
+            using the `SolarSysttemBody` method
+            `determine_if_rings_illuminated`.
         dra : Angle
             Optional angular offset in right ascension.
         ddec : Angle
@@ -2165,6 +2339,9 @@ class SolarSystemBody:
             The list of rings to plot.
         arcs : list[str] | None
             The list of arcs to plot.
+        pericenter_markers : bool, optional
+            If true, place markers at the pericenters of eccentric rings.
+            Currently applies only to some of the rings of Uranus.
 
         Returns
         -------
@@ -2198,8 +2375,8 @@ class SolarSystemBody:
                 if distance_range is None:
                     distance_range = (distances[0].max() -
                                       distances[0].min())
-                plot_ring(axis, coords, distances, eclipsed, side, dra,
-                          ddec)
+                plot_ring(axis, coords, distances, eclipsed, side, lit, dra,
+                          ddec, **kwargs)
                 if arcs is None:
                     use_arcs = list(ring.arcs.keys())
                 else:
@@ -2208,33 +2385,31 @@ class SolarSystemBody:
                     arc_distances = ring.get_arc_distances(
                         arc, time, observer)
                     mean_distance = np.mean(arc_distances)
+                    extra_distance = 0.25 * distance_range
+                    check_distance = (mean_distance <
+                                      body_distance + extra_distance)
+
                     # check if near ansa, if so, skip for backside and only
                     # draw on the front side to avoid ring overlap issues
-                    if side == 'back':
-                        if ((np.abs(mean_distance - body_distance)
-                             < 0.5 * distance_range) or
-                                (mean_distance < body_distance)):
-                            coords = ring.get_arc_sky_coordinates(
-                                arc, time, observer, boundaries=True)
-                            plot_arc(axis, coords, dra, ddec)
-                    elif side == 'front':
-                        if (np.abs(mean_distance - body_distance)
-                                < 0.5 * distance_range):
-                            pass
-                        elif mean_distance > body_distance:
-                            coords = ring.get_arc_sky_coordinates(
-                                arc, time, observer, boundaries=True)
-                            plot_arc(axis, coords, dra, ddec)
+                    if side == 'back' and not check_distance:
+                        coords = ring.get_arc_sky_coordinates(
+                            arc, time, observer, boundaries=True)
+                        plot_arc(axis, coords, dra, ddec)
+                    elif side == 'front' and check_distance:
+                        coords = ring.get_arc_sky_coordinates(
+                            arc, time, observer, boundaries=True)
+                        plot_arc(axis, coords, dra, ddec, **kwargs)
 
         # pericenter parkers
-        for name in rings:
-            if name in self._rings.keys():
-                ring = self._rings[name]
-                coord, distance = (
-                    self._get_ring_pericenters(ring, time, observer))
-                place_ring_pericenter_markers(axis, coord, distance,
-                                              body_distance, side, dra,
-                                              ddec)
+        if pericenter_markers:
+            for name in rings:
+                if name in self._rings.keys():
+                    ring = self._rings[name]
+                    coord, distance = (
+                        self._get_ring_pericenters(ring, time, observer))
+                    place_ring_pericenter_markers(axis, coord, distance,
+                                                  body_distance, side, dra,
+                                                  ddec, **kwargs)
 
     def draw(self,
              axis: WCSAxes,
@@ -2242,8 +2417,12 @@ class SolarSystemBody:
              observer: str,
              rings: list[str] | str = None,
              arcs: list[str] | str = None,
+             shadow_casting_bodies: list[str] = None,
+             ring_pericenter_markers: bool = False,
              dra: Angle = Angle(0, unit='deg'),
-             ddec: Angle = Angle(0, unit='deg')) -> None:
+             ddec: Angle = Angle(0, unit='deg'),
+             silent: bool = False,
+             **kwargs) -> None:
         """
         Draw the planet (and optionally its rings and/or ring arcs) for a given
         time and observer.
@@ -2265,76 +2444,139 @@ class SolarSystemBody:
         arcs : list[str] | str, optional
             A list of arcs to plot. If `None`, all arcs will be shown. If an
             empty list, no arcs will be shown.
+        shadow_casting_bodies : list[str], optional
+            The names of all bodies you want to (potentially) cast a shadow on
+            this body. This list can include the name of this body (which will
+            be skipped), so if you want all potential shadows you can pass a
+            list of every body being drawn. If `None`, no projected shadows
+            from other bodies will be drawn.
+        ring_pericenter_markers : bool, optional
+            If true, place markers at the pericenters of eccentric rings.
+            Currently applies only to some of the rings of Uranus.
         dra : Angle, optional
             Angular offset in right ascension.
         ddec : Angle, optional
             Angular offset in declination.
+        silent: bool
+            If `True`, will suppress any terminal output detailing which parts
+            are being drawn.
+        **kwargs
+            Keyword arguments that will apply to every part of the drawn
+            object. This will probably be things like `alpha`.
 
         Returns
         -------
         None
             None.
         """
+        if not silent:
+            print(f'Drawing {self._name} at {time.to_string()}...')
 
-        # if not the primary body, plot any shadow from the primary body
-        occultation_code = 0
-        parent_name = None
-        et = get_et(time)
-        if str(self._code)[1:3] != '99':
-            parent_name = spiceypy.bodc2n(int(f'{str(self._code)[0]}99'))
-            occultation_code = determine_eclipse_or_transit(
-                self._name, parent_name, et, observer)
+        # get occultation codes for other bodies
+        if shadow_casting_bodies is None:
+            shadow_casting_bodies = []
+        occultation_codes = {}
+        for body in shadow_casting_bodies:
+            if body == self._name:
+                continue
+            else:
+                occultation_codes[body] = (
+                    self.get_eclipsed(body, time, observer))
+
+        # determine if rings are illuminated to the observer
+        lit = self.determine_if_rings_illuminated(time, observer)
 
         # rings back side
         if rings is None:
             rings = list(self._rings.keys())
+        elif rings == 'none':
+            rings = []
         else:
             rings = self._parse_list_or_str(rings)
-        self._parse_and_plot_ring(axis, time, observer, side='back', dra=dra,
-                                  ddec=ddec, rings=rings, arcs=arcs)
+        if not silent and (len(self._rings) != 0):
+            print('   Plotting back half of rings')
+        self._parse_and_plot_ring(axis, time, observer, side='back', lit=lit,
+                                  dra=dra, ddec=ddec, rings=rings, arcs=arcs,
+                                  pericenter_markers=ring_pericenter_markers)
 
-        # plot the disk
+        # plot the disk, if fully occulted change color to shadow color
         coords = self.get_limb_sky_coordinates(time, observer)
         facecolor = 'white'
-        if occultation_code == 3:
+        if -3 in occultation_codes.values():
             facecolor = _default_night_patch_kwargs()['facecolor']
-        plot_disk(axis, coords, dra, ddec, facecolor=facecolor)
+        if not silent:
+            print('   Drawing apparent disk')
+        plot_disk(axis, coords, dra, ddec, facecolor=facecolor, **kwargs)
 
         # plot night side
         limb_coords = self.get_limb_sky_coordinates(time, observer)
         terminator_coords = self.get_terminator_sky_coordinates(time, observer)
-        plot_nightside(axis, limb_coords, terminator_coords, dra, ddec)
+        if not silent:
+            print('   Drawing nightside')
+        plot_nightside(axis, limb_coords, terminator_coords, dra, ddec,
+                       **kwargs)
 
-        if (occultation_code == 1) & (parent_name is not None):
-            disk_coords = self.get_dayside_sky_coordinates(time, observer)
-            shadow_coords = self.get_shadow_intersection_sky_coordinates(
-                parent_name, time, observer)
-            plot_primary_shadow(axis, disk_coords, shadow_coords, dra, ddec)
+        # plot shadows from other bodies
+        for body in shadow_casting_bodies:
+            if body == self._name:
+                continue
+            code = occultation_codes[body]
+            if code < 0:
+                if code == -1:
+                    disk_coords = self.get_dayside_sky_coordinates(
+                        time, observer)
+                    shadow_coords = (
+                        self.get_shadow_intersection_sky_coordinates(
+                            body, time, observer))
+                elif code == -2:
+                    disk_coords = None
+                    shadow_coords = (
+                        self.get_shadow_intersection_sky_coordinates(
+                            body, time, observer))
+                else:
+                    disk_coords = None
+                    shadow_coords = self.get_dayside_sky_coordinates(
+                        time, observer)
+                if not silent:
+                    print(f'   Drawing shadow from {body}')
+                plot_nightside(axis, disk_coords, shadow_coords, dra, ddec,
+                               **kwargs)
 
         # plot latitudes
-        for latitude in np.arange(-60, 60+30, 30) * u.degree:
+        if not silent:
+            print('   Plotting latitudes')
+        for latitude in np.arange(-60, 60 + 30, 30) * u.degree:
             coords = self.get_latitude_line_coordinates(
                 time, observer, latitude)
-            plot_latlon(axis, coords, dra, ddec)
+            plot_latlon(axis, coords, dra, ddec, **kwargs)
 
         # plot longitudes
+        if not silent:
+            print('   Plotting longitudes')
         linewidth = plt.rcParams['lines.linewidth'] / 2
         for longitude in np.arange(30, 360, 30) * u.degree:
             coords = self.get_longitude_line_coordinates(
                 time, observer, longitude)
-            plot_latlon(axis, coords, dra, ddec)
+            plot_latlon(axis, coords, dra, ddec, **kwargs)
         longitude = 0 * u.degree
         coords = self.get_longitude_line_coordinates(time, observer, longitude)
+        if not silent:
+            print('   Plotting prime meridian')
         plot_latlon(axis, coords, dra, ddec, edgecolor='black',
-                    linewidth=linewidth)
+                    linewidth=linewidth, **kwargs)
 
         # plot the limb
         coords = self.get_limb_sky_coordinates(time, observer)
-        plot_limb(axis, coords, dra, ddec)
+        if not silent:
+            print('   Plotting the limb')
+        plot_limb(axis, coords, dra, ddec, **kwargs)
 
         # rings/arcs front side
-        self._parse_and_plot_ring(axis, time, observer, side='front', dra=dra,
-                                  ddec=ddec, rings=rings, arcs=arcs)
+        if not silent and (len(self._rings) != 0):
+            print('   Plotting front half of rings')
+        self._parse_and_plot_ring(axis, time, observer, side='front', lit=lit,
+                                  dra=dra, ddec=ddec, rings=rings, arcs=arcs,
+                                  pericenter_markers=ring_pericenter_markers)
 
     @property
     def name(self) -> str:
@@ -2355,3 +2597,35 @@ class SolarSystemBody:
     def rings(self) -> dict[str, Ring]:
         """A dictionary containing the object's rings, if any."""
         return self._rings
+
+
+def sort_by_distance(names: list[str],
+                     time: Time,
+                     observer: str) -> list[str]:
+    """
+    Convenience function to sort ephemeris objects by their distance from the
+    observer from furthest to closest.
+
+    Parameters
+    ----------
+    names : list[str]
+        A list of names of ephemeris objects.
+    time : Time
+        The UTC time of the observation.
+    observer : str
+        The observer or observatory. Could be a Solar System body like
+        "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+        like "Juno".
+
+    Returns
+    -------
+    list[str]
+        The sorted names of the ephemeris objects.
+    """
+    distances = []
+    for name in names:
+        ssb = SolarSystemBody(name)
+        distances.append(ssb.get_observer_target_distance(
+            time=time, observer=observer).value)
+    ind = np.flip(np.argsort(distances))
+    return [names[i] for i in ind]

@@ -2,7 +2,7 @@
 
     SITES += ( '<__site__>' )
     <__site__>_CENTER = 399
-    <__site__>_FRAME = 'IAU_Earth'
+    <__site__>_FRAME = 'ITRF93'
     <__site__>_IDCODE = <__code__>
     <__site__>_LATLON = (<__lat__>, <__lon__>, <__alt__>)
     <__site__>_BOUNDS = (@1950-JAN-01/00:00, @2150-JAN-01/00:00)

@@ -10,8 +10,6 @@ from matplotlib.patches import Polygon
 
 from planetviewer.spice_functions import ref
 
-wcs_shape = (3, 3)
-"""Default WCS window shape."""
 
 standard_colors = {
     'red': '#D62728',
@@ -36,13 +34,30 @@ standard_colors = {
 
 
 def _default_limb_kwargs() -> dict:
+    """
+    Default patch edge kwargs for a body's apparent limb.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(closed=True,
                 edgecolor=standard_colors['black'],
                 facecolor='none',
-                linewidth=plt.rcParams['lines.linewidth']/2)
+                linewidth=plt.rcParams['lines.linewidth']/2,
+                capstyle='round')
 
 
 def _default_disk_kwargs() -> dict:
+    """
+    Default patch fill kwargs for a body's apparent disk.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(closed=True,
                 edgecolor='none',
                 facecolor=standard_colors['white'],
@@ -50,6 +65,14 @@ def _default_disk_kwargs() -> dict:
 
 
 def _default_night_patch_kwargs() -> dict:
+    """
+    Default patch fill kwargs for a nighside disk.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(facecolor=standard_colors['grey'],
                 edgecolor='none',
                 linewidth=0,
@@ -57,6 +80,14 @@ def _default_night_patch_kwargs() -> dict:
 
 
 def _default_latlon_kwargs() -> dict:
+    """
+    Default patch edge kwargs for latitude/longitude lines.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(edgecolor=standard_colors['darkergrey'],
                 facecolor='none',
                 closed=False,
@@ -65,32 +96,77 @@ def _default_latlon_kwargs() -> dict:
 
 
 def _default_lit_ring_edge_kwargs() -> dict:
+    """
+    Default patch edge kwargs for the edge of a ring illuminated by sunlight.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(edgecolor=standard_colors['darkergrey'],
                 facecolor='none',
                 closed=False,
-                linewidth=plt.rcParams['lines.linewidth']/4)
+                linewidth=plt.rcParams['lines.linewidth']/4,
+                capstyle='round')
 
 
 def _default_lit_ring_fill_kwargs() -> dict:
+    """
+    Default patch fill kwargs for a ring with non-zero width.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(edgecolor='none',
                 facecolor=standard_colors['lightestgrey'],
                 closed=True)
 
 
 def _default_eclipsed_ring_edge_kwargs() -> dict:
+    """
+    Default patch edge kwargs for the edge of a ring eclipsed by the main body.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
+    plt.rcParams['lines.dashed_pattern'] = 3.7, 3.7
     return dict(edgecolor=standard_colors['darkergrey'],
                 facecolor='none',
                 closed=False,
-                linewidth=plt.rcParams['lines.linewidth']/4)
+                linewidth=plt.rcParams['lines.linewidth']/4,
+                linestyle='--',
+                capstyle='round')
 
 
 def _default_eclipsed_ring_fill_kwargs() -> dict:
+    """
+    Default patch fill kwargs for a ring with non-zero width eclipsed by the
+    main body.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(closed=True,
                 edgecolor='none',
                 facecolor=standard_colors['grey'])
 
 
 def _default_pericenter_marker_kwargs() -> dict:
+    """
+    Default scatter kwargs for ring pericenter markers.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(color=standard_colors['black'],
                 marker='.',
                 s=(4*plt.rcParams['lines.linewidth'])**2,
@@ -99,6 +175,14 @@ def _default_pericenter_marker_kwargs() -> dict:
 
 
 def _default_arc_kwargs() -> dict:
+    """
+    Default patch edge kwargs for ring arcs.
+
+    Returns
+    -------
+    dict
+        A dictionary of kwargs.
+    """
     return dict(edgecolor=standard_colors['black'],
                 facecolor='none',
                 closed=False,
@@ -108,7 +192,9 @@ def _default_arc_kwargs() -> dict:
 
 # noinspection PyUnresolvedReferences
 def make_wcs(center: SkyCoord,
-             fov: Angle) -> WCS:
+             fov: Angle,
+             shape: tuple[int, int] = (3, 3),
+             scale: float = 1.000001) -> tuple[WCS, tuple[int, int]]:
     """
     Convenience function for generating a WCS projection for plotting and
     coordinate transforms.
@@ -119,20 +205,27 @@ def make_wcs(center: SkyCoord,
         The center of the field of view.
     fov : Angle
         The width/height of the field of view.
+    shape : tuple[int, int]
+        The pixel dimensions of the field of view.
+    scale : float
+        Extends the boundaries slightly to account for edge cases where ticks
+        are just slightly outside of the defined plot edges.
 
     Returns
     -------
     WCS
         The WCS for plotting and coordinate transforms.
+    tuple
+        The pixel dimensions of the field of view.
     """
-    fov *= 1.000001  # helps ensure the actual edge values are shown
+    fov *= scale  # helps ensure the actual edge values are shown
     wcs = WCS(naxis=2)
-    wcs.wcs.crpix = [wcs_shape[1] / 2 + 0.5, wcs_shape[0] / 2 + 0.5]
+    wcs.wcs.crpix = [shape[1] / 2 + 0.5, shape[0] / 2 + 0.5]
     wcs.wcs.crval = [center.ra.degree, center.dec.degree]
     wcs.wcs.cunit = ["deg", "deg"]
     wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-    wcs.wcs.cdelt = [-fov.degree/wcs_shape[1], fov.degree/wcs_shape[0]]
-    return wcs
+    wcs.wcs.cdelt = [-fov.degree / shape[1], fov.degree / shape[0]]
+    return wcs, shape
 
 
 def set_standard_axis_labels(axis: WCSAxes) -> None:
@@ -154,7 +247,7 @@ def set_standard_axis_labels(axis: WCSAxes) -> None:
     axis.set_ylabel(f'Declination ({ref})')
 
 
-def set_standard_axis_limits(axis: WCSAxes) -> None:
+def set_standard_axis_limits(axis: WCSAxes, shape: tuple[int, int]) -> None:
     """
     Reset the plot limits of a WCS axis. This is usually necessary after
     drawing objects in the field of view because Matplotlib will scale the axis
@@ -164,14 +257,16 @@ def set_standard_axis_limits(axis: WCSAxes) -> None:
     ----------
     axis : WCSAxes
         The axis in need of limiting.
+    shape : tuple[int, int]
+
 
     Returns
     -------
     None
         None.
     """
-    axis.set_xlim(-0.5, wcs_shape[0] - 0.5)
-    axis.set_ylim(-0.5, wcs_shape[1] - 0.5)
+    axis.set_xlim(-0.5, shape[0] - 0.5)
+    axis.set_ylim(-0.5, shape[1] - 0.5)
     axis.set_aspect('equal')
 
 
@@ -222,9 +317,9 @@ def convert_to_relative_axis(center: SkyCoord,
 def _parse_kwargs(kwargs: dict,
                   default_kwargs: dict) -> dict:
     """
-    Combine any user-provided kwargs with existing default kwargs, overriding 
+    Combine any user-provided kwargs with existing default kwargs, overriding
     the defaults when necessary.
-    
+
     Parameters
     ----------
     kwargs : dict
@@ -308,7 +403,7 @@ def plot_limb(axis: WCSAxes,
               **kwargs) -> None:
     """
     Draw the target body's limb.
-    
+
     Parameters
     ----------
     axis : WCSAxes
@@ -379,8 +474,8 @@ def plot_disk(axis: WCSAxes,
 
 
 def plot_nightside(axis: WCSAxes,
-                   limb_coords: list[SkyCoord],
-                   terminator_coords: list[SkyCoord],
+                   limb_coords: list[SkyCoord] | None,
+                   terminator_coords: list[SkyCoord] | None,
                    dra: Angle = Angle(0, unit='deg'),
                    ddec: Angle = Angle(0, unit='deg'),
                    **kwargs):
@@ -391,10 +486,10 @@ def plot_nightside(axis: WCSAxes,
     ----------
     axis : WCSAxes
         The axis in which to plot the nightside shading.
-    limb_coords : list[SkyCoord]
+    limb_coords : list[SkyCoord] or None
         The coordinates of the target body's limb. Can be generated with the
         `Planet` method 'get_limb_sky_coordinates'.
-    terminator_coords : list[SkyCoord]
+    terminator_coords : list[SkyCoord] or None
         The coordinates of the target body's terminator. Can be generated with
         the `Planet` method 'get_terminator_sky_coordinates'.
     dra : Angle, optional
@@ -413,47 +508,50 @@ def plot_nightside(axis: WCSAxes,
     transform = axis.get_transform('world')
     kwargs = _parse_kwargs(kwargs, _default_night_patch_kwargs())
 
-    # first calculate the limb points
-    limb_ra, limb_dec = _retrieve_coords(limb_coords, dra, ddec)
+    # case 1: shadow from smaller transiting object or full disk:
+    if limb_coords is None:
+        ra, dec = _retrieve_coords(terminator_coords, dra, ddec)
 
-    # then calculate the terminator points
-    terminator_ra, terminator_dec = _retrieve_coords(
-        terminator_coords, dra, ddec)
+    # case 2: shadow only falls partially on the disk
+    else:
+        # first calculate the limb points
+        limb_ra, limb_dec = _retrieve_coords(limb_coords, dra, ddec)
 
-    # find the intersection of the limb with the apparent terminator
-    try:
-        start = np.sqrt((limb_ra - terminator_ra[0])**2 +
-                        (limb_dec - terminator_dec[0])**2).argmin()
-        end = np.sqrt((limb_ra - terminator_ra[-1])**2 +
-                      (limb_dec - terminator_dec[-1])**2).argmin()
-        ind = np.arange(start, start+np.size(limb_ra), 1) % limb_ra.size
-        ind0 = np.where(ind == start)[0][0]
-        ind1 = np.where(ind == end)[0][0]
-        ind = ind[ind0:ind1]
-    # if the observer is the Sun, then there is no nightside!
-    except IndexError:
-        return
+        # then calculate the terminator points
+        terminator_ra, terminator_dec = _retrieve_coords(
+            terminator_coords, dra, ddec)
 
-    # select the limb section
-    limb_ra = np.flip(limb_ra[ind])
-    limb_dec = np.flip(limb_dec[ind])
+        # find the intersection of the limb with the apparent terminator
+        try:
+            start = np.sqrt((limb_ra - terminator_ra[0]) ** 2 +
+                            (limb_dec - terminator_dec[0]) ** 2).argmin()
+            end = np.sqrt((limb_ra - terminator_ra[-1]) ** 2 +
+                          (limb_dec - terminator_dec[-1]) ** 2).argmin()
+            ind = np.arange(start, start + np.size(limb_ra), 1) % limb_ra.size
+            ind0 = np.where(ind == start)[0][0]
+            ind1 = np.where(ind == end)[0][0]
+            ind = ind[ind0:ind1]
+        # if the observer is the Sun, then there is no nightside!
+        except IndexError:
+            return
 
-    # join the coordinates
-    ra = np.concatenate((terminator_ra, limb_ra))
-    dec = np.concatenate((terminator_dec, limb_dec))
-    xy = np.concatenate(([ra], [dec])).T
+        # select the limb section
+        limb_ra = np.flip(limb_ra[ind])
+        limb_dec = np.flip(limb_dec[ind])
+
+        # join the coordinates
+        ra = np.concatenate((terminator_ra, limb_ra))
+        dec = np.concatenate((terminator_dec, limb_dec))
 
     # plot the night side
+    xy = np.concatenate(([ra], [dec])).T
     nightside = Polygon(xy, transform=transform, **kwargs)
     axis.add_patch(nightside)
 
 
-# TODO: try to convert this to an intersection of two Polygons, that way it
-#  won't matter what the shapes are or whether or not the shadow is smaller or
-#  larger than the primary target.
 def plot_primary_shadow(axis: WCSAxes,
-                        disk_coords: list[SkyCoord],
-                        shadow_coords: list[SkyCoord],
+                        disk_coords: list[SkyCoord] | None,
+                        shadow_coords: list[SkyCoord] | None,
                         dra: Angle = Angle(0, unit='deg'),
                         ddec: Angle = Angle(0, unit='deg'),
                         **kwargs):
@@ -465,10 +563,10 @@ def plot_primary_shadow(axis: WCSAxes,
     ----------
     axis : WCSAxes
         The axis in which to plot the nightside shading.
-    disk_coords : list[SkyCoord]
+    disk_coords : list[SkyCoord] or None
         The coordinates of the target body's apparent dayside. Can be generated
         with the `Planet` method 'get_dayside_sky_coordinates'.
-    shadow_coords : list[SkyCoord]
+    shadow_coords : list[SkyCoord] or None
         The coordinates of the shadow casting body's shadow where it intersects
         the target body's disk. Can be generated with the
         `Planet` method 'get_shadow_intersection_sky_coordinates'.
@@ -489,7 +587,6 @@ def plot_primary_shadow(axis: WCSAxes,
                    **kwargs)
 
 
-# TODO: add examples in each of these docstrings.
 # noinspection DuplicatedCode
 def plot_latlon(axis: WCSAxes,
                 coords: list[SkyCoord],
@@ -527,12 +624,28 @@ def plot_latlon(axis: WCSAxes,
     xy = np.concatenate(([ra], [dec])).T
 
     line = Polygon(xy, transform=transform, **kwargs)
-    axis.add_patch(line)
+    try:
+        axis.add_patch(line)
+    except AttributeError:
+        pass
 
 
-def _expand_ind(ind: np.ndarray, size: int) -> np.ndarray:
+def _expand_ind(ind: np.ndarray,
+                size: int) -> np.ndarray:
     """
     Add an additional index at the end for slicing ring boundary arrays.
+
+    Parameters
+    ----------
+    ind : np.ndarray
+        A set of indices.
+    size : int
+        The total number of potential indices.
+
+    Returns
+    -------
+    np.ndarray
+        The expanded set of indices.
     """
     if len(ind) == 0:
         return ind
@@ -542,6 +655,19 @@ def _expand_ind(ind: np.ndarray, size: int) -> np.ndarray:
 
 
 def _remove_jumps(ind: np.ndarray) -> np.ndarray:
+    """
+    Account for 350 -> 0 jump.
+
+    Parameters
+    ----------
+    ind : np.ndarray
+        A set of indices.
+
+    Returns
+    -------
+    np.ndarray
+        The set of indices with the jump removed.
+    """
     loc = np.where(np.diff(ind) > 1)[0]
     if len(loc) == 0:
         return ind
@@ -551,6 +677,19 @@ def _remove_jumps(ind: np.ndarray) -> np.ndarray:
 
 
 def _find_sets(ind: np.ndarray) -> list[np.ndarray]:
+    """
+    Find subsets of indices within a larger set.
+
+    Parameters
+    ----------
+    ind : np.ndarray
+        A set of indices.
+
+    Returns
+    -------
+    list[np.ndarray]
+        The subsets of indices.
+    """
     locs = np.where(np.diff(ind) > 1)[0]
     if len(locs) == 0:
         return [ind]
@@ -561,6 +700,21 @@ def _find_sets(ind: np.ndarray) -> list[np.ndarray]:
 
 def _get_side_indices(distances: np.ndarray,
                       side: str) -> np.ndarray:
+    """
+    Get indices for a particular side.
+
+    Parameters
+    ----------
+    distances : np.ndarray
+        Distances to each point on the ring.
+    side : str
+        The side of the ring, either 'inner' or 'outer'.
+
+    Returns
+    -------
+    np.ndarray
+        The indices for that side.
+    """
     center = distances.argmin()
     count = distances.size
     if side == 'front':
@@ -577,6 +731,7 @@ def plot_ring(axis: WCSAxes,
               distances: list[np.ndarray],
               eclipsed: list[np.ndarray],
               side: str,
+              lit: bool,
               dra: Angle = Angle(0, unit='deg'),
               ddec: Angle = Angle(0, unit='deg'),
               eclipse_edge_kwargs: dict = None,
@@ -613,6 +768,9 @@ def plot_ring(axis: WCSAxes,
     side : str
         The side of the rings to plot, either 'front' or 'back'. You'll want to
         plot the back first, then plot the planet, then the front.
+    lit : bool
+        Whether or not the rings appear lit to the observer. Can be found using
+        the `SolarSysttemBody` method `determine_if_rings_illuminated`.
     dra : Angle, optional
         Angular offset in right ascension.
     ddec : Angle, optional
@@ -642,10 +800,16 @@ def plot_ring(axis: WCSAxes,
                                         _default_eclipsed_ring_edge_kwargs())
     eclipse_fill_kwargs = _parse_kwargs(eclipse_fill_kwargs,
                                         _default_eclipsed_ring_fill_kwargs())
-    lit_edge_kwargs = _parse_kwargs(lit_edge_kwargs,
-                                    _default_lit_ring_edge_kwargs())
-    lit_fill_kwargs = _parse_kwargs(lit_fill_kwargs,
-                                    _default_lit_ring_fill_kwargs())
+    if lit:
+        lit_edge_kwargs = _parse_kwargs(lit_edge_kwargs,
+                                        _default_lit_ring_edge_kwargs())
+        lit_fill_kwargs = _parse_kwargs(lit_fill_kwargs,
+                                        _default_lit_ring_fill_kwargs())
+    elif not lit:
+        lit_edge_kwargs = _parse_kwargs(lit_edge_kwargs,
+                                        _default_eclipsed_ring_edge_kwargs())
+        lit_fill_kwargs = _parse_kwargs(lit_fill_kwargs,
+                                        _default_eclipsed_ring_fill_kwargs())
 
     # get indices
     ind = [_get_side_indices(i, side) for i in distances]
@@ -697,12 +861,18 @@ def plot_ring(axis: WCSAxes,
             xy = np.concatenate(([ra_eclipsed_outer], [dec_eclipsed_outer])).T
             line = Polygon(xy, transform=transform, **eclipse_edge_kwargs)
             axis.add_patch(line)
-        
+
         # get lit coordinates
         inner_sets = _find_sets(
             np.intersect1d(np.setxor1d(eclipsed[0], ind[0]), ind[0]))
         outer_sets = _find_sets(
             np.intersect1d(np.setxor1d(eclipsed[1], ind[1]), ind[1]))
+        if len(inner_sets) != len(outer_sets):  # account for singularities
+            avg = np.array([np.mean(i) for i in outer_sets])
+            ind = np.where(np.abs(avg - np.mean(inner_sets)) > 5)[0][0]
+            bounds = np.array([eclipsed_inner[0], eclipsed_inner[-1]])
+            inner = bounds[np.abs(bounds - outer_sets[ind]).argmin()]
+            inner_sets.insert(ind, np.array([inner]))
         for i, j in zip(inner_sets, outer_sets):
             inner = _expand_ind(_remove_jumps(i), count)
             outer = _expand_ind(_remove_jumps(j), count)
@@ -735,7 +905,8 @@ def plot_ring(axis: WCSAxes,
     else:
         # get coordinates
         ra, dec = _retrieve_coords(coords[0], dra, ddec)
-        ra_eclipsed, dec_eclipsed = ra[eclipsed[0]], dec[eclipsed[0]]
+        select = _expand_ind(_remove_jumps(eclipsed[0]), count)
+        ra_eclipsed, dec_eclipsed = ra[select], dec[select]
 
         # draw eclipsed section if it exists
         if (ra_eclipsed.size != 0) & draw_eclipsed:
@@ -854,7 +1025,7 @@ def plot_arc(axis: WCSAxes,
 
     ra, dec = _retrieve_coords(coords, dra, ddec)
     if len(ra) < 2:
-        axis.scatter(ra, dec, marker='.', s=(2*lw)**2, color=fc, ec='none',
+        axis.scatter(ra, dec, marker='.', s=(2 * lw) ** 2, color=fc, ec='none',
                      transform=transform)
     else:
         xy = np.concatenate(([ra], [dec])).T
@@ -889,11 +1060,11 @@ def _parse_object_label_position(label_position: str) -> dict:
 
     va = {'upper': 'baseline', 'center': 'center', 'lower': 'top'}
     ha = {'left': 'right', 'center': 'center', 'right': 'left'}
-    angle = {'center right': 0*u.deg, 'upper right': 45*u.deg,
-             'upper center': 90*u.deg, 'upper left': 135*u.deg,
-             'center left': 180*u.deg, 'lower left': 235*u.deg,
-             'lower center': 270*u.deg, 'lower right': 315*u.deg,
-             'center': 0*u.deg}
+    angle = {'center right': 0 * u.deg, 'upper right': 45 * u.deg,
+             'upper center': 90 * u.deg, 'upper left': 135 * u.deg,
+             'center left': 180 * u.deg, 'lower left': 235 * u.deg,
+             'lower center': 270 * u.deg, 'lower right': 315 * u.deg,
+             'center': 0 * u.deg}
     offset = fs / 4
     xytext = {'center right': (offset, 0), 'upper right': (offset, offset),
               'upper center': (0, offset), 'upper left': (-offset, offset),
@@ -938,7 +1109,7 @@ def place_label(axis: WCSAxes,
     position: str
         The label's position as a combination of the vertical and horizontal
         position. For example, 'top right' will work, but 'right top' is a bad
-        ideal. Vertical position can be one of 'top', 'center' or 'bottom'.
+        ideal. Vertical position can be one of 'upper', 'center' or 'lower'.
         Horizontal position can be one of 'left', 'center' or 'right'. If you
         want it directly in the center, use a single 'center' instead of
         'center center'.

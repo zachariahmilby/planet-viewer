@@ -8,6 +8,10 @@ below. It is integrated with Astropy's `Angle` and derived objects like
 the functions and methods are decently described in their docstrings, but I'll 
 provide some overviews and a few examples here.
 
+>**CAUTION**<br>
+> Because of all of the Matplotlib transforms and plotting, this can be 
+> significantly slower than the PDS Planet Viewers.
+
 ## Installation
 Here are some installation instructions for the average Anaconda user; if 
 you're more advanced I'm sure you can figure it out from here. (Note: in the
@@ -118,6 +122,8 @@ arguments detailed in their docstrings.
 | `get_sun_target_distance`                 | Get the distance from the Sun to the object's barycenter.                                                   |
 | `get_observer_target_distance`            | Get the distance from the observer to the object's barycenter.                                              |
 | `get_light_travel_time`                   | Get the light travel time between a SPICE ephemeris object and the object's barycenter.                     |
+| `get_apparent_epoch`                      | Get the apparent epoch at the object as seen by the observer.                                               |
+| `get_necessary_epoch`                     | Get the observer epoch necessary to observe the target at a given epoch.                                    |
 | `get_latlon_sky_coordinates`              | Get the apparent RA/Dec of a latitude/longitude point on the object's surface.                              |
 | `get_longitude_line_coordinates`          | Get the apparent RA/Dec of an entire meridian.                                                              |
 | `get_latitude_line_coordinates`           | Get the apparent RA/Dec of an entire parallel.                                                              |
@@ -128,6 +134,7 @@ arguments detailed in their docstrings.
 | `get_angular_radius`                      | Convert the object's mean equatorial radius to angular radius on the sky.                                   |
 | `get_angular_offset_between_times`        | Calculate the RA/Dec offset necessary to shift this object's sky coordinates between two times.             |
 | `parse_fov`                               | Convert an angle, length or scalar to an angular field-of-view.                                             |
+| `check_for_shadows`                       | Determine if a body casts a shadow on another body or vice-versa.                                           |
 | `draw`                                    | A convenience function to draw a planet in an Astropy `WCSAxes` axis.                                       |
 
 ## Visualization with Matplotlib
@@ -174,3 +181,4 @@ individual docstrings provide more detailed instructions for their use.
 | `set_standard_axis_labels`      | Set standard J2000 axis labels.                                                                  |
 | `set_standard_axis_limits`      | Ensures axis limits match the chosen center and FOV.                                             |
 | `convert_to_relative_axis`      | Convert axis from absolute RA/Dec to relative angle from the center.                             |
+| `sort_by_distance`              | Sort a list of ephemeris objects by their distance from furthest to closest.                     |

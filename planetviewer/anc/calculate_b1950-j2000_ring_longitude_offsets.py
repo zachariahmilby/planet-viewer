@@ -1,10 +1,10 @@
 import numpy as np
 import spiceypy as spice
-from astropy.coordinates import Angle, SkyCoord
+from astropy.coordinates import Angle
 
-from planetviewer.spice_kernels import load_spice_kernels
+from planetviewer import furnish_spice_kernels
 
-load_spice_kernels()
+furnish_spice_kernels()
 
 # the time doesn't really matter here since these frames aren't time-dependent
 et = 0
