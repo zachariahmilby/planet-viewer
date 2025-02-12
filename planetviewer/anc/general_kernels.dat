@@ -1,0 +1,5 @@
+key,kernel,path
+PCK,pck00010.tpc,generic_kernels/pck/
+PCK,gm_de440.tpc,generic_kernels/pck/
+LSK,naif0012.tls,generic_kernels/lsk/
+SPK,de440.bsp,generic_kernels/spk/planets/

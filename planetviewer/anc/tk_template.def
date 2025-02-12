@@ -1,0 +1,15 @@
+\begindata
+ 
+  FRAME_<__site__>             = 1<__code__>
+  FRAME_1<__code__>_NAME       = '<__site__>'
+  FRAME_1<__code__>_CLASS      = 4
+  FRAME_1<__code__>_CLASS_ID   = 1<__code__>
+  FRAME_1<__code__>_CENTER     = <__code__>
+
+  TKFRAME_1<__code__>_SPEC     = 'ANGLES'
+  TKFRAME_1<__code__>_RELATIVE = 'ITRF93'
+  TKFRAME_1<__code__>_ANGLES   = ( <__lon__>, <__colat__>, 180 )
+  TKFRAME_1<__code__>_AXES     = (         3,           2,   3 )
+  TKFRAME_1<__code__>_UNITS    = 'DEGREES'
+
+\begintext

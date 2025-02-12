@@ -5,7 +5,9 @@ from urllib.parse import urljoin
 
 import astropy.units as u
 import requests
-import spiceypy
+import spiceypy as spice
+from spiceypy.utils.exceptions import SpiceNOSUCHFILE
+import pandas as pd
 from astropy.coordinates import EarthLocation, Angle, Latitude, Longitude
 from tqdm import tqdm
 
@@ -20,25 +22,8 @@ pck_kernel = 'pck00010.tpc'
 """Set planetary constants kernel; the new pck00011.tpc kernel makes some major 
 changes to longitudes on Mars and Neptune."""
 
-kernel_path = ''
+kernel_path = Path(_project_directory, 'anc', 'kernels')
 """Variable to hold local SPICE kernel path."""
-
-
-def set_kernel_path(path: str or Path) -> None:
-    """
-    Set local kernel path.
-
-    Parameters
-    ----------
-    path
-
-    Returns
-    -------
-
-    """
-    global kernel_path
-    if kernel_path == '':
-        kernel_path = path
 
 
 class _SPICEKernel:
@@ -180,7 +165,7 @@ class _SPICEKernel:
         None
             None.
         """
-        spiceypy.furnsh(str(self.local_path))
+        spice.furnsh(str(self.local_path))
 
     @property
     def name(self) -> str:
@@ -241,7 +226,7 @@ class _EarthObservatory:
         self._altitude = altitude.to(u.km)
         self._code = code
 
-    def _make_frame_def(self) -> Path:
+    def _make_spk_def(self) -> Path:
         """
         Make observatory input definitions file for use by `pinpoint`.
 
@@ -250,11 +235,11 @@ class _EarthObservatory:
         out_file : Path
             The path to the definitions file.
         """
-        template = Path(_project_directory, 'anc', 'obs_template.def')
+        template = Path(_project_directory, 'anc', 'spk_template.def')
         with open(template, 'r') as file:
             lines = file.readlines()
-            lines = [line.replace('<__site__>', self._name.upper())
-                     for line in lines]
+            name = self._name.upper().replace(' ', '_')
+            lines = [line.replace('<__site__>', name) for line in lines]
             lines = [line.replace('<__lat__>', f'{self._latitude.deg}')
                      for line in lines]
             lines = [line.replace('<__lon__>',  f'{self._longitude.deg}')
@@ -287,14 +272,14 @@ class _EarthObservatory:
         """
         pinpoint_binary = Path(_project_directory, 'anc', 'pinpoint')
         os.chmod(pinpoint_binary, 0o777)  # ensure binary is executable
-        out_file = Path(kernel_path, 'observatories',
-                        f'{self._name.lower()}.bsp')
+        out_file = Path(kernel_path, 'observatories', 'spk',
+                        f'{self._name.lower().replace(" ", "")}.bsp')
         pck = Path(kernel_path, 'generic_kernels', 'pck', pck_kernel)
         if (out_file.exists()) & (overwrite is True):
             os.remove(out_file)
         elif (out_file.exists()) & (overwrite is False):
             return out_file
-        in_file = self._make_frame_def()
+        in_file = self._make_spk_def()
         if not out_file.parent.exists():
             out_file.parent.mkdir(parents=True)
         cmd = f'{str(pinpoint_binary)} -def {str(in_file)} ' \
@@ -303,8 +288,9 @@ class _EarthObservatory:
         os.remove(in_file)
         return out_file
 
-    def make_kernel(self,
-                    overwrite: bool = False) -> [_SPICEKernel]:
+    # noinspection DuplicatedCode
+    def make_spk_kernel(self,
+                        overwrite: bool = False) -> [_SPICEKernel]:
         """
         Generate a SPICEKernel object for this observatory's SPK kernel.
 
@@ -321,18 +307,87 @@ class _EarthObservatory:
             A list containing the SPK kernel for this observatory.
         """
         path = self._make_spk_kernel(overwrite=overwrite)
-        kernel = _SPICEKernel(name=f'{self._name.lower()}.bsp',
-                              location=str(path.parent), remote=False)
+        kernel = _SPICEKernel(
+            name=f'{self._name.lower().replace(" ", "")}.bsp',
+            location=str(path.parent), remote=False)
         code = int(f'399{self._code:0>3}')
-        spiceypy.boddef(self._name, code)
+        spice.boddef(self._name, code)
         return [kernel]
 
+    def _make_tk_kernel(self,
+                         overwrite: bool = False) -> Path:
+        """
+        Make an TK kernel for the observatory.
+
+        Parameters
+        ----------
+        overwrite : bool, optional
+            Whether or not to overwrite an existing kernel. Really only
+            necessary if any parameters have changed (like coordinates or valid
+            time ranges).
+
+        Returns
+        -------
+        out_file : Path
+            The path to the observatory SPK kernel binary.
+        """
+        template = Path(_project_directory, 'anc', 'tk_template.def')
+        with open(template, 'r') as file:
+            lines = file.readlines()
+            name = self._name.upper().replace(' ', '_')
+            lines = [line.replace('<__site__>', name) for line in lines]
+            lines = [
+                line.replace('<__colat__>', f'{-(90 - self._latitude.deg)}')
+                for line in lines]
+            lines = [line.replace('<__lon__>', f'{-self._longitude.deg}')
+                     for line in lines]
+            lines = [line.replace('<__alt__>', f'{self._altitude.value}')
+                     for line in lines]
+            lines = [line.replace('<__code__>', f'399{self._code}')
+                     for line in lines]
+        out_file = Path(kernel_path, 'observatories', 'tk',
+                        f'{self._name.lower().replace(" ", "")}.tf')
+        if (out_file.exists()) & (overwrite is True):
+            os.remove(out_file)
+        elif (out_file.exists()) & (overwrite is False):
+            return out_file
+        if not out_file.parent.exists():
+            out_file.parent.mkdir(parents=True)
+        with open(out_file, 'w') as file:
+            file.writelines(lines)
+        return out_file
+
+    # noinspection DuplicatedCode
+    def make_tk_kernel(self,
+                        overwrite: bool = False) -> [_SPICEKernel]:
+        """
+        Generate a SPICEKernel object for this observatory's SPK kernel.
+
+        Parameters
+        ----------
+        overwrite : bool, optional
+            Whether or not to overwrite an existing kernel. Really only
+            necessary if any parameters have changed (like coordinates or valid
+            time ranges).
+
+        Returns
+        -------
+        list[_SPICEKernel]
+            A list containing the SPK kernel for this observatory.
+        """
+        path = self._make_tk_kernel(overwrite=overwrite)
+        kernel = _SPICEKernel(
+            name=f'{self._name.lower().replace(" ", "")}.tf',
+            location=str(path.parent), remote=False)
+        code = int(f'399{self._code:0>3}')
+        spice.boddef(self._name, code)
+        return [kernel]
 
 def _earth_obs_kernel_from_name(name: str,
                                 code: int,
                                 overwrite: bool = False) -> list[_SPICEKernel]:
     """
-    Automatically generate an observing site kernel using coordinates from
+    Automatically generate an observing site's kernels using coordinates from
     Astropy.
 
     Parameters
@@ -350,7 +405,7 @@ def _earth_obs_kernel_from_name(name: str,
     Returns
     -------
     list[_SPICEKernel]
-        A list containing the SPK kernel for this observatory.
+        A list containing the SPK and FK kernels for this observatory.
     """
     location = EarthLocation.of_site(name)
     observatory = _EarthObservatory(name=name,
@@ -358,8 +413,9 @@ def _earth_obs_kernel_from_name(name: str,
                                     longitude=location.lon,
                                     altitude=location.height,
                                     code=code)
-    kernel = observatory.make_kernel(overwrite=overwrite)
-    return kernel
+    spk_kernel = observatory.make_spk_kernel(overwrite=overwrite)
+    tk_kernel = observatory.make_tk_kernel(overwrite=overwrite)
+    return spk_kernel + tk_kernel
 
 
 def _earth_obs_kernel_from_coords(
@@ -370,7 +426,8 @@ def _earth_obs_kernel_from_coords(
         altitude: u.Quantity,
         overwrite: bool = False) -> list[_SPICEKernel]:
     """
-    Generate an observing site kernel using user-specified coordinates.
+    Generate an observing site's SPK and FK kernels using user-specified
+    coordinates.
 
     Parameters
     ----------
@@ -392,13 +449,14 @@ def _earth_obs_kernel_from_coords(
     Returns
     -------
     list[_SPICEKernel]
-        A list containing the SPK kernel for this observatory.
+        A list containing the SPK and FK kernels for this observatory.
     """
     observatory = _EarthObservatory(
         name=name, latitude=latitude, longitude=longitude, altitude=altitude,
         code=code)
-    kernel = observatory.make_kernel(overwrite=overwrite)
-    return kernel
+    spk_kernel = observatory.make_spk_kernel(overwrite=overwrite)
+    tk_kernel = observatory.make_tk_kernel(overwrite=overwrite)
+    return spk_kernel + tk_kernel
 
 
 def _get_naif_kernels() -> list[_SPICEKernel]:
@@ -412,59 +470,16 @@ def _get_naif_kernels() -> list[_SPICEKernel]:
         A list of SPICE kernels.
     """
 
-    planetary_kernels = {
-        'Mercury': [],
-        'Venus': [],
-        'Earth': [_SPICEKernel(name='earth_1962_240827_2124_combined.bpc',
-                               location='generic_kernels/pck/'),
-                  _SPICEKernel(name='earth_assoc_itrf93.tf',
-                               location='generic_kernels/fk/planets/'),
-                  _SPICEKernel(name='moon_pa_de440_200625.bpc',
-                               location='generic_kernels/pck/'),
-                  _SPICEKernel(name='moon_de440_220930.tf',
-                               location='generic_kernels/fk/satellites/')],
-        'Mars': [_SPICEKernel(name='mar097.bsp',
-                              location='generic_kernels/spk/satellites/')],
-        'Jupiter': [_SPICEKernel(name='jup344.bsp',
-                                 location='generic_kernels/spk/satellites/'),
-                    _SPICEKernel(name='jup346.bsp',
-                                 location='generic_kernels/spk/satellites/'),
-                    _SPICEKernel(name='jup365.bsp',
-                                 location='generic_kernels/spk/satellites/')],
-        'Saturn': [_SPICEKernel(name='sat415.bsp',
-                                location='generic_kernels/spk/satellites/'),
-                   _SPICEKernel(name='sat441.bsp',
-                                location='generic_kernels/spk/satellites/'),
-                   _SPICEKernel(name='sat454.bsp',
-                                location='generic_kernels/spk/satellites/')],
-        'Uranus': [_SPICEKernel(name='ura115.bsp',
-                                location='generic_kernels/spk/satellites/'),
-                   _SPICEKernel(name='ura116.bsp',
-                                location='generic_kernels/spk/satellites/'),
-                   _SPICEKernel(name='ura117.bsp',
-                                location='generic_kernels/spk/satellites/'),
-                   _SPICEKernel(name='ura182.bsp',
-                                location='generic_kernels/spk/satellites/')],
-        'Neptune': [_SPICEKernel(name='nep095.bsp',
-                                 location='generic_kernels/spk/satellites/'),
-                    _SPICEKernel(name='nep104.bsp',
-                                 location='generic_kernels/spk/satellites/'),
-                    _SPICEKernel(name='nep105.bsp',
-                                 location='generic_kernels/spk/satellites/')],
-        'Pluto': [_SPICEKernel(name='plu060.bsp',
-                               location='generic_kernels/spk/satellites/')]
-    }
-
-    kernels = [
-        _SPICEKernel(name=pck_kernel, location='generic_kernels/pck/'),
-        _SPICEKernel(name='gm_de440.tpc', location='generic_kernels/pck/'),
-        _SPICEKernel(name='naif0012.tls', location='generic_kernels/lsk/'),
-        _SPICEKernel(name='de440.bsp', location='generic_kernels/spk/planets/')
-    ]
-
-    for key, val in planetary_kernels.items():
-        kernels.extend(val)
-
+    path0 = Path(_project_directory, 'anc', 'general_kernels.dat')
+    data0 = pd.read_csv(path0, delimiter=',')
+    path1 = Path(_project_directory, 'anc', 'planetary_kernels.dat')
+    data1 = pd.read_csv(path1, delimiter=',')
+    data = pd.merge(data0, data1, how='outer', on=['key','kernel','path'])
+    kernels = []
+    for i in range(len(data)):
+        kernel = _SPICEKernel(name=data['kernel'].iloc[i],
+                              location=data['path'].iloc[i])
+        kernels.append(kernel)
     return kernels
 
 
@@ -473,33 +488,16 @@ def _get_spacecraft_kernels() -> list[_SPICEKernel]:
     Return a list of spacecraft kernels from NAIF.
     """
 
-    spacecraft_kernels = {
-        'JWST': [_SPICEKernel(name='jwst_pred.bsp',
-                              location='JWST/kernels/spk/'),
-                 _SPICEKernel(name='jwst_rec.bsp',
-                              location='JWST/kernels/spk/')],
-        'HST': [_SPICEKernel(name='hst.bsp',
-                             location='HST/kernels/spk/')],
-        'Galileo': [_SPICEKernel(name='gll_951120_021126_raj2021.bsp',
-                                 location='GLL/kernels/spk/')],
-        'Juno': [_SPICEKernel(name='juno_pred_orbit.bsp',
-                              location='JUNO/kernels/spk/'),
-                 _SPICEKernel(name='juno_rec_orbit.bsp',
-                              location='JUNO/kernels/spk/')],
-        'Cassini': [_SPICEKernel(name='171215R_SCPSEops_97288_17258.bsp',
-                                 location='CASSINI/kernels/spk/')],
-        'Voyager 1': [_SPICEKernel(name='vgr1.x2100.bsp',
-                                   location='VOYAGER/kernels/spk/')],
-        'Voyager 2': [_SPICEKernel(name='vgr2.x2100.bsp',
-                                   location='VOYAGER/kernels/spk/')]
-    }
+    data = pd.read_csv(Path(_project_directory, 'anc', 'spacecraft.dat'),
+                       delimiter=',')
+    kernels = []
+    for i in range(len(data)):
+        kernel = _SPICEKernel(name=data['kernel'].iloc[i],
+                              location=data['path'].iloc[i])
+        kernels.append(kernel)
 
     # add 'Galileo' as a body
-    spiceypy.boddef('Galileo', -77)
-
-    kernels = []
-    for key, val in spacecraft_kernels.items():
-        kernels.extend(val)
+    spice.boddef('Galileo', -77)
 
     return kernels
 
@@ -507,9 +505,7 @@ def _get_spacecraft_kernels() -> list[_SPICEKernel]:
 def _get_observatory_kernels(
         overwrite: bool = False) -> list[_SPICEKernel]:
     """
-    Get a dictionary of all the other NAIF kernels aside from the common
-    kernels. This includes the high-precision ITRF93 (Earth) and MEAN_ME (Moon)
-    frames, satellites and select spacecraft.
+    Construct observatory SPK kernels.
 
     Parameters
     ----------
@@ -519,78 +515,18 @@ def _get_observatory_kernels(
     """
 
     """Set some observatory sites. Coordinates taken from JPL Horizons."""
-    observatory_kernels = {
-        'ALMA': _earth_obs_kernel_from_coords(
-            'ALMA', 999,
-            latitude=Latitude(-23.029211*u.deg),
-            longitude=Longitude(292.2452521*u.deg),
-            altitude=5.07489*u.km,
-            overwrite=overwrite),
-        'Apache_Point': _earth_obs_kernel_from_coords(
-            'Apache_Point', 705,
-            latitude=Latitude(32.7805613*u.deg),
-            longitude=Longitude(254.1794*u.deg),
-            altitude=2.79488*u.km,
-            overwrite=overwrite),
-        'Cahill_Roof': _earth_obs_kernel_from_coords(
-            'Cahill_Roof', 997,
-            latitude=Latitude(34.1354666 * u.deg),
-            longitude=Longitude(241.8734532 * u.deg),
-            altitude=800*u.imperial.ft,
-            overwrite=overwrite),
-        'Keck': _earth_obs_kernel_from_coords(
-            'Keck', 568,
-            latitude=Latitude(19.8260847*u.deg),
-            longitude=Longitude(204.5278*u.deg),
-            altitude=4.21024*u.km,
-            overwrite=overwrite),
-        'Kitt_Peak': _earth_obs_kernel_from_coords(
-            'Kitt_Peak', 695,
-            latitude=Latitude(32.7805613*u.deg),
-            longitude=Longitude(254.1794*u.deg),
-            altitude=2.79488*u.km,
-            overwrite=overwrite),
-        'Lowell': _earth_obs_kernel_from_coords(
-            'Lowell', 690,
-            latitude=Latitude(35.2018865*u.deg),
-            longitude=Longitude(248.3367*u.deg),
-            altitude=2.22399*u.km,
-            overwrite=overwrite),
-        'Maunakea': _earth_obs_kernel_from_coords(
-            'Maunakea', 568,
-            latitude=Latitude(19.8260847 * u.deg),
-            longitude=Longitude(204.5278 * u.deg),
-            altitude=4.21024 * u.km,
-            overwrite=overwrite),
-        'McDonald': _earth_obs_kernel_from_coords(
-            'McDonald', 711,
-            latitude=Latitude(30.6715043*u.deg),
-            longitude=Longitude(255.9785*u.deg),
-            altitude=2.10673*u.km,
-            overwrite=overwrite),
-        'Palomar': _earth_obs_kernel_from_coords(
-            'Palomar', 675,
-            latitude=Latitude(33.354136*u.deg),
-            longitude=Longitude(243.1375*u.deg),
-            altitude=1.70489*u.km,
-            overwrite=overwrite),
-        'Sommers_Bausch': _earth_obs_kernel_from_coords(
-            'Sommers_Bausch', 463,
-            latitude=Latitude(40.0040628*u.deg),
-            longitude=Longitude(254.7375*u.deg),
-            altitude=1.66163*u.km,
-            overwrite=overwrite),
-        'VLT': _earth_obs_kernel_from_coords(
-            'VLT', 998,
-            latitude=Latitude(-24.6254085*u.deg),
-            longitude=Longitude(289.5971949*u.deg),
-            altitude=2.635*u.km,
-            overwrite=overwrite)
-        }
-
+    data = pd.read_csv(Path(_project_directory, 'anc', 'observatories.dat'),
+                       delimiter=',')
     kernels = []
-    for key, val in observatory_kernels.items():
-        kernels.extend(val)
+    for i in range(len(data)):
+        kernel = _earth_obs_kernel_from_coords(
+            name=data['key'].iloc[i],
+            code=data['code'].iloc[i],
+            latitude=Latitude(data['lat'].iloc[i]*u.deg),
+            longitude=Longitude(data['lon'].iloc[i]*u.deg),
+            altitude=data['alt'].iloc[i]*u.km,
+            overwrite=overwrite)
+        kernels.extend(kernel)
 
     return kernels
 
@@ -631,14 +567,14 @@ def make_custom_observer(name: str,
     """
     kernel = _earth_obs_kernel_from_coords(name,
                                            code,
-                                           latitude=latitude,
-                                           longitude=longitude,
+                                           latitude=Angle(latitude),
+                                           longitude=Angle(longitude),
                                            altitude=altitude,
                                            overwrite=overwrite)
     kernel[0].furnish()
 
 
-def download_spice_kernels(overwrite: bool = False) -> None:
+def _download_spice_kernels(update: bool = False) -> None:
     """
     Wrapper function to download all SPICE kernels. You must set the local
     directory where you want the kernels downloaded before calling this
@@ -646,7 +582,7 @@ def download_spice_kernels(overwrite: bool = False) -> None:
 
     Parameters
     ----------
-    overwrite : bool
+    update : bool
         Whether or not to overwrite existing kernels. Default is `False`.
 
     Returns
@@ -654,16 +590,12 @@ def download_spice_kernels(overwrite: bool = False) -> None:
     None
         None.
     """
-
-    if kernel_path == '':
-        raise RuntimeError('You must set the local kernel path.')
-
     for kernel in _get_naif_kernels() + _get_spacecraft_kernels():
-        kernel.download(overwrite=overwrite)
-    _get_observatory_kernels(overwrite=overwrite)
+        kernel.download()
+    _get_observatory_kernels(overwrite=update)
 
 
-def furnish_spice_kernels() -> None:
+def _furnish_spice_kernels() -> None:
     """
     Wrapper function to furnish all package-dependent SPICE kernels.
 
@@ -672,9 +604,25 @@ def furnish_spice_kernels() -> None:
     None
         None.
     """
-    if kernel_path == '':
-        raise RuntimeError('You must set the local kernel path.')
-
-    kernels = _get_naif_kernels() + _get_spacecraft_kernels() + _get_observatory_kernels()
+    kernels = (_get_naif_kernels() +
+               _get_spacecraft_kernels() +
+               _get_observatory_kernels())
     for kernel in kernels:
-        kernel.furnish()
+        try:
+            kernel.furnish()
+        except SpiceNOSUCHFILE:
+            kernel.download()
+            kernel.furnish()
+
+
+def update_spice_kernels() -> None:
+    """
+    Wrapper function to update all SPICE kernels.
+
+    Returns
+    -------
+    None
+        None.
+    """
+    print('Checking for updates to SPICE kernels...')
+    _download_spice_kernels(update=True)

@@ -159,6 +159,33 @@ def get_sky_coordinates(target: str,
     return ra, dec
 
 
+def get_azel(target: str,
+             et: float,
+             obs: str) -> tuple[float, float]:
+    """
+    Get the azimuth and elevation of an object as viewed from a specified
+    observatory at a given epoch.
+
+    Parameters
+    ----------
+    target : str
+        Name of target body.
+    et : float
+        Observer epoch.
+    obs : str
+        Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
+
+    Returns
+    -------
+    tuple[float, float]
+        The object azimuth and elecation in [rad]. Azimuth is measured
+        counterclockwise. Azimuth is measured relative to the horizon.
+    """
+    ptarg, _ = spice.spkpos(target, et, obs, abcorr, obs)
+    _, az, el = spice.recazl(ptarg, False, True)
+    return az, el
+
+
 def get_light_time(target: str,
                    et: float,
                    obs: str,

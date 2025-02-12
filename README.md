@@ -31,30 +31,31 @@ You're now ready to use the `planetviewer` package!
 
 ## SPICE Kernels
 
-`planetviewer` use NASA's SPICE system for ephemeris calculations. The 
-necessary data files for these computations (called "kernels") will need to be 
-downloaded. The first thing you need to do is set the local path where your 
-kernels are (or will be) stored. You can do this using `set_kernel_path()`. The 
-wrapper function `download_spice_kernels()` will download all needed kernels to
-the path you defined using `set_kernel_path()`. It will compare your current 
-kernels and will downloaded updated versions if they exist online. If you pass 
-the keyword argument `overwrite=True` every kernel will be downloaded again. 
-Once all the kernels have been downloaded, you will need to use 
-`furnish_spice_kernels()` to "furnish" them, meaning the information in them is
-available to use in calculations.
+`planetviewer` use NASA's SPICE system for ephemeris calculations. The first 
+time you create a `SolarSystemBody` (see "Ephemeris Calculations" section 
+below) the package will download all data files (called "kernels") it needs to
+make calculations. Some kernels are frequently updated, particularly for 
+spacecraft with evolving orbits like JWST and HST. To update the kernels, 
+import and call the function `update_spice_kernels()`.
 
-> **NOTE**<br>
-> Once your kernels are up-to-date, you don't need to run 
-> `download_spice_kernels()` again until you want to update them. Using this 
-> package will subsequently only require you to set the local kernel path with 
-> `set_kernel_path()` and furnish the kernels with `furnish_spice_kernels()`.
+You can also furnish additional kernels using the `furnsh()` function available
+in `spiceypy`.
 
 ## Observers
-The choice of observer/observatory can be one of three types:
-1. Any planetary body defined in SPICE (major planets, minor planets or 
-satellites),
+Observers must be provided as a string. The choice of observer/observatory can 
+be one of three types:
+1. A planetary body defined in SPICE (major planets, minor planets, 
+   satellites or asteroids),
 2. A spacecraft, or
 3. A ground-based observatory on Earth.
+
+The lists below detail which of each type are currently available. I haven't 
+figured out comets yet.
+
+Available planets/satellites/asteroids:
+- See the "NAMES" column in the "Barycenters", "Planets and Satellites", 
+  "Asteroids" sections of 
+  https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/naif_ids.html.
 
 Available spacecraft:
 - `JWST`: James Webb Space Telescope
@@ -67,16 +68,20 @@ Available spacecraft:
 
 Available ground-based Earth observatories:
 - `ALMA`: Atacama Large Millimeter/submillimeter Array
-- `Apache_Point`: Apache Point Observatory, New Mexico, United States
-- `Cahill_Roof`: Roof of Cahill Center for Astronomy and Astrophysics, Pasadena, California, United States
+- `Apache Point`: Apache Point Observatory, New Mexico, United States
+- `Cahill Roof`: Roof of Cahill Center for Astronomy and Astrophysics, Pasadena, California, United States
 - `Keck`: W. M. Keck Observatory, Hawaii, United States
-- `Kitt_Peak`: Kitt Peak National Observatory, Arizona, United States
+- `Kitt Peak`: Kitt Peak National Observatory, Arizona, United States
 - `Lowell`: Lowell Observatory, Arizona, United States
 - `Maunakea`: W. M. Keck Observatory, Hawaii, United States
 - `McDonald`: McDonald Observatory, Texas, United States
 - `Palomar`: Palomar Observatory, California, United States
-- `Sommers_Bausch`: Sommers-Bausch Observatory, Colorado, United States
+- `Sommers Bausch`: Sommers-Bausch Observatory, Colorado, United States
 - `VLT`: Very Large Telescope, Chile
+
+You can also make a custom observer for anywhere on Earth using the function
+`make_custom_observer()` which will then be available as an observer using the
+name provided.
 
 ## Times
 Observation epochs (the time of an observation at the observer) must be 
@@ -104,8 +109,9 @@ detailed below.
 > I don't believe in west longitudes. Neither does SPICE. All longitudes 
 > returned by methods or otherwise reported from this package are east 
 > longitudes. I wish I could change the definition of the north pole on planets
-> like Venus and Uranus, but I'll save that for another time. As a Boulder 
-> mom's bumper sticker might say, "be the change you want to see in the world."
+> like Venus and Uranus to the angular momentum pole, but I'll save that for 
+> another time. As a Boulder mom's bumper sticker might say, "be the change you 
+> want to see in the world."
 
 ### Ephemeris Calculation Methods
 The following table lists all of the ephemeris methods available in the 
@@ -119,10 +125,11 @@ arguments detailed in their docstrings.
 
 | Method                                     | Description                                                                                                 |
 |:-------------------------------------------|:------------------------------------------------------------------------------------------------------------|
-| `get_ra`                                   | Get J2000 right ascension.                                                                                  |
-| `get_dec`                                  | Get J2000 declination.                                                                                      |
 | `get_skycoord`                             | Get J2000 sky coordinate (RA/Dec).                                                                          |
 | `get_offset`                               | Get offset between this object and another `SkyCoord` object.                                               |
+| `get_radec_rates`                          | Get rate at which target's Ra/Dec is changing.                                                              |
+| `get_altaz`                                | Get alt/az coordinates for a given observer.                                                                |
+| `get_altaz_rates`                          | Get rate at which target's alt/az is changing.                                                              |
 | `get_sub_observer_latitude`                | Get apparent sub-observer latitude on the planet.                                                           |
 | `get_sub_observer_longitude`               | Get apparent sub-observer longitude on the planet.                                                          |
 | `get_subsolar_latitude`                    | Get apparent sub-solar latitude on the planet.                                                              |

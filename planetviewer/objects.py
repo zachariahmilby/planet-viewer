@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from astropy import units as u
-from astropy.coordinates import Angle, SkyCoord, Latitude, Longitude
+from astropy.coordinates import Angle, SkyCoord, Latitude, Longitude, AltAz
 from astropy.time import Time
 from astropy.visualization.wcsaxes.core import WCSAxes
 
@@ -14,6 +14,7 @@ from planetviewer.plotting import (
     plot_limb, plot_disk, plot_nightside, plot_latlon, plot_ring, plot_arc,
     place_ring_pericenter_markers, _default_night_patch_kwargs)
 from planetviewer.spice_functions import *
+from planetviewer.spice_kernels import _furnish_spice_kernels
 
 
 def _r(semimajor_axis: u.Quantity,
@@ -1005,79 +1006,21 @@ class SolarSystemBody:
         Parameters
         ----------
         name : str
-            The name of the Solar System object. Must be available in SPICE.
+            The name of a Solar System ephemeris object. Must be available in
+            SPICE.
         """
+        self._check_if_kernels_furnished()
         self._name = name
         self._code = spice.bodn2c(name)
         self._prograde = determine_prograde_rotation(name)
         self._fixref = get_target_frame(name)
         self._rings = self._get_rings()
 
-    def get_ra(self,
-               time: Time,
-               observer: str,
-               string: bool = False) -> str | Angle:
-        """
-        Get astrometric right ascension for a given UTC time and
-        observer/observatory.
-
-        Parameters
-        ----------
-        time : Time
-            UTC at the time of observation.
-        observer : str
-            The observer or observatory. Could be a Solar System body like
-            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
-            like "Juno".
-        string : bool
-            If true, return the RA as an hms string with 4 decimal places of
-            precision.
-
-        Returns
-        -------
-        str | Angle
-            The RA as either a string or Astropy `Angle` object.
-        """
-        et = spice.str2et(time.isot)
-        ra, _ = get_sky_coordinates(self._name, et, observer)
-        ra = Angle(ra * angle_unit)
-        if string:
-            return ra.to_string(unit=u.hour, precision=4)
-        else:
-            return ra
-
-    def get_dec(self,
-                time: Time,
-                observer: str,
-                string: bool = False) -> str | Angle:
-        """
-        Get astrometric declination for a given UTC time and
-        observer/observatory.
-
-        Parameters
-        ----------
-        time : Time
-            UTC at the time of observation.
-        observer : str
-            The observer or observatory. Could be a Solar System body like
-            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
-            like "Juno".
-        string : bool
-            If true, return the declination as an hms string with 3 decimal
-            places of precision.
-
-        Returns
-        -------
-        str | Angle
-            The declination as either a string or Astropy `Angle` object.
-        """
-        et = spice.str2et(time.isot)
-        _, dec = get_sky_coordinates(self._name, et, observer)
-        dec = Angle(dec * angle_unit)
-        if string:
-            return dec.to_string(unit=u.degree, precision=3)
-        else:
-            return dec
+    @staticmethod
+    def _check_if_kernels_furnished():
+        count = spice.ktotal('ALL')
+        if count == 0:
+            _furnish_spice_kernels()
 
     def get_skycoord(self,
                      time: Time,
@@ -1135,6 +1078,86 @@ class SolarSystemBody:
         coord = self.get_skycoord(time, observer)
         offset = refcoord.spherical_offsets_to(coord)
         return offset[0].to(u.arcsec), offset[1].to(u.arcsec)
+
+    def get_radec_rates(self,
+                        time: Time,
+                        observer: str) -> tuple[u.Quantity, u.Quantity]:
+        """
+        Get rates of change of astrometric right ascension and declination for
+        a given UTC time and observer/observatory.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        tuple[u.Quantity, u.Quantity]
+            The angular rates (dra, ddec) in units of [arcsec/hr].
+        """
+        coord0 = self.get_skycoord(time-0.5*u.s, observer)
+        coord1 = self.get_skycoord(time+0.5*u.s, observer)
+        offsets = coord0.spherical_offsets_to(coord1)
+        dra, ddec = offsets[0] / u.s, offsets[1] / u.s
+        return dra.to(u.arcsec / u.hr), ddec.to(u.arcsec / u.hr)
+
+    def get_altaz(self,
+                  time: Time,
+                  observer: str) -> AltAz:
+        """
+        Get altitude and azimuth coordinates for a given UTC time and
+        observer/observatory.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        tuple[Angle, Angle]
+            The alt/az sky coordinates as a Astropy `Angle` objects.
+        """
+        et = spice.str2et(time.isot)
+        az, alt = get_azel(self._name, et, observer)
+        return AltAz(alt=alt*angle_unit, az=az*angle_unit)
+
+    def get_altaz_rates(self,
+                        time: Time,
+                        observer: str) -> tuple[u.Quantity, u.Quantity]:
+        """
+        Get rates of change of altitude and azimuth for a given UTC time and
+        observer/observatory.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        tuple[u.Quantity, u.Quantity]
+            The angular rates (dra, ddec) in units of [arcsec/hr].
+        """
+        coord0 = self.get_altaz(time-0.5*u.s, observer)
+        coord1 = self.get_altaz(time+0.5*u.s, observer)
+        alt = self.get_altaz(time, observer).alt
+        dalt = ((coord1.alt - coord0.alt) / u.s).to(u.arcsec/u.min)
+        daz = ((coord1.az - coord0.az) / u.s).to(u.arcsec/u.min) * np.cos(alt)
+        return dalt, daz
 
     def get_sub_observer_latitude(self,
                                   time: Time,
@@ -1266,9 +1289,9 @@ class SolarSystemBody:
         phase = get_sub_observer_phase_angle(self._name, et, observer)
         return Angle(phase * angle_unit).to(u.degree)
 
-    def get_distance(self,
-                     time: Time,
-                     observer: str) -> u.Quantity:
+    def _get_distance(self,
+                      time: Time,
+                      observer: str) -> u.Quantity:
         """
         Get the distance to the object for a given UTC time and
         observer/observatory.
@@ -1583,7 +1606,7 @@ class SolarSystemBody:
             The distance between the Sun and the target as an Astropy
             `Quantity` object.
         """
-        return self.get_distance(time, 'Sun').to(u.au)
+        return self._get_distance(time, 'Sun').to(u.au)
 
     def get_observer_target_distance(self,
                                      time: Time,
@@ -1606,7 +1629,7 @@ class SolarSystemBody:
             The distance between the observer and the target as an Astropy
             `Quantity` object.
         """
-        return self.get_distance(time, observer)
+        return self._get_distance(time, observer)
 
     def get_light_travel_time(self,
                               time: Time,
@@ -2051,7 +2074,7 @@ class SolarSystemBody:
         Angle
             The angular radius of the body as an Astropy `Angle` object.
         """
-        distance = self.get_distance(time, observer)
+        distance = self._get_distance(time, observer)
         re = np.mean(get_radii(self._name)[:2])
         return Angle(np.arctan(re * length_unit / distance)).to(u.arcsec)
 
@@ -2231,7 +2254,7 @@ class SolarSystemBody:
         Angle
             The angular field-of-view as an Astropy `Angle` object.
         """
-        distance = self.get_distance(time, observer)
+        distance = self._get_distance(time, observer)
         if isinstance(fov, int) or isinstance(fov, float):
             fov = self.get_angular_radius(time, observer) * fov
         else:
@@ -2348,7 +2371,7 @@ class SolarSystemBody:
         None
             None.
         """
-        body_distance = self.get_distance(time, observer)
+        body_distance = self._get_distance(time, observer)
         edges = ['inner', 'outer']
 
         for name in rings:

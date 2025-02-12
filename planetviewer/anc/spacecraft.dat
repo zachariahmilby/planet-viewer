@@ -1,0 +1,10 @@
+key,kernel,path
+JWST,jwst_pred.bsp,JWST/kernels/spk/
+JWST,jwst_rec.bsp,JWST/kernels/spk/
+HST,hst.bsp,HST/kernels/spk/
+Galileo,gll_951120_021126_raj2021.bsp,GLL/kernels/spk/
+Juno,juno_pred_orbit.bsp,JUNO/kernels/spk/
+Juno,juno_rec_orbit.bsp,JUNO/kernels/spk/
+Cassini,171215R_SCPSEops_97288_17258.bsp,CASSINI/kernels/spk/
+Voyager1,vgr1.x2100.bsp,VOYAGER/kernels/spk/
+Voyager2,vgr2.x2100.bsp,VOYAGER/kernels/spk/
