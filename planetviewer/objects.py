@@ -4,17 +4,19 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import spiceypy as spice
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord, Latitude, Longitude, AltAz
 from astropy.time import Time
 from astropy.visualization.wcsaxes.core import WCSAxes
+from spiceypy.utils.exceptions import NotFoundError
 
 from planetviewer.files import _project_directory
 from planetviewer.plotting import (
     plot_limb, plot_disk, plot_nightside, plot_latlon, plot_ring, plot_arc,
     place_ring_pericenter_markers, _default_night_patch_kwargs)
 from planetviewer.spice_functions import *
-from planetviewer.spice_kernels import _furnish_spice_kernels
+from planetviewer.spice_kernels import _furnish_kernels_if_not_in_pool
 
 
 def _r(semimajor_axis: u.Quantity,
@@ -1009,22 +1011,17 @@ class SolarSystemBody:
             The name of a Solar System ephemeris object. Must be available in
             SPICE.
         """
-        self._check_if_kernels_furnished()
+        _furnish_kernels_if_not_in_pool()
         self._name = name
         self._code = spice.bodn2c(name)
         self._prograde = determine_prograde_rotation(name)
         self._fixref = get_target_frame(name)
         self._rings = self._get_rings()
 
-    @staticmethod
-    def _check_if_kernels_furnished():
-        count = spice.ktotal('ALL')
-        if count == 0:
-            _furnish_spice_kernels()
-
     def get_skycoord(self,
                      time: Time,
-                     observer: str) -> SkyCoord:
+                     observer: str,
+                     kind: str = 'astrometric') -> SkyCoord:
         """
         Get astrometric right ascension and declination for a given UTC time
         and observer/observatory.
@@ -1037,6 +1034,9 @@ class SolarSystemBody:
             The observer or observatory. Could be a Solar System body like
             "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
             like "Juno".
+        kind: str
+            Type of coordinates to return. Options are "astrometric" for J2000
+            coordinates and "apparent" for apparent equator-of-date.
 
         Returns
         -------
@@ -1044,8 +1044,46 @@ class SolarSystemBody:
             The sky coordinates as an Astropy `SkyCoord` object.
         """
         et = spice.str2et(time.isot)
-        ra, dec = get_sky_coordinates(self._name, et, observer)
+        reffrm = 'J2000'
+        aberr = 'LT'
+        if kind == 'apparent':
+            aberr = 'LT+S'
+            if str(spice.bodn2c(observer))[:3] == '399':
+                reffrm = 'EARTH_TEEOD'
+        ra, dec = get_sky_coordinates(self._name, et, observer, reffrm, aberr)
         return SkyCoord(ra=ra * angle_unit, dec=dec * angle_unit)
+
+    def get_constellation(self,
+                          time: Time,
+                          observer: str,
+                          kind: str = 'astrometric',
+                          short_name: bool = False) -> str:
+        """
+        Get the constellation for this object's RA/Dec for a given UTC time
+        and observer/observatory.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+        kind: str
+            Type of coordinates to use. Options are "astrometric" for J2000
+            coordinates and "apparent" for apparent equator-of-date.
+        short_name: bool
+            Whether or not to return the full constellation name or the IAU
+            abbreviation, e.g., 'Virgo' vs. 'Vir'.
+
+        Returns
+        -------
+        str
+            The name of the constellation.
+        """
+        coord = self.get_skycoord(time, observer, kind)
+        return coord.get_constellation(short_name=short_name)
 
     def get_offset(self,
                    time: Time,
@@ -1159,6 +1197,41 @@ class SolarSystemBody:
         daz = ((coord1.az - coord0.az) / u.s).to(u.arcsec/u.min) * np.cos(alt)
         return dalt, daz
 
+    def get_airmass(self,
+                    time: Time,
+                    observer: str) -> float:
+        """
+        Get the object's airmass for a given UTC time and observer/observatory.
+        Uses the formula of Young (1994) rather than sec(z). Currently only for
+        ground-based sites on Earth. If you want the less accurate sec(z)
+        version, you can get it as a property from the `altaz` object.
+        According to the paper (as summarized on Wikipedia), this has a maximum
+        error at the horizon of 0.0037 air masses.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        float
+            The object's airmass.
+        """
+        altaz = self.get_altaz(time, observer)
+        z = 90 * u.degree - altaz.alt
+        if z > 90 * u.degree:
+            return np.nan
+        cosz = np.cos(z)
+        numerator = 1.002432*cosz**2 + 0.148386*cosz + 0.0096467
+        denominator = cosz**3 + 0.149864*cosz**2 + 0.0102963*cosz + 0.000303978
+        return numerator / denominator
+
+
     def get_sub_observer_latitude(self,
                                   time: Time,
                                   observer: str) -> Latitude:
@@ -1256,8 +1329,8 @@ class SolarSystemBody:
         Returns
         -------
         Longitude
-            The sub-observer planetographic latitude as an Astropy `Longitude`
-            object.
+            The sub-observer planetographic east longitude as an Astropy
+            `Longitude` object.
         """
         et = spice.str2et(time.isot)
         _, lon = get_sub_solar_latlon(self._name, et, observer)
@@ -1539,7 +1612,7 @@ class SolarSystemBody:
             sublon = self.get_subsolar_longitude(time, observer)
         else:
             sublon = self.get_sub_observer_longitude(time, observer)
-        longitude = (sublon - ascnode) % 360 * u.degree
+        longitude = (sublon - ascnode) % (360 * u.degree)
         return Longitude(longitude).to(u.degree)
 
     def get_ring_subsolar_longitude(self,
@@ -1793,6 +1866,32 @@ class SolarSystemBody:
         """
         et = spice.str2et(time.isot)
         return determine_if_in_shadow(self._name, other_body_name, et, observer)
+
+    def get_solar_longitude(self,
+                            time: Time,
+                            observer: str) -> Longitude:
+        """
+        Get the planetocentric longitude of the Sun (also called L_s), a metric
+        for time of year.
+
+        Parameters
+        ----------
+        time : Time
+            UTC at the time of observation.
+        observer : str
+            The observer or observatory. Could be a Solar System body like
+            "Ganymede", an Earth-based observatory like "Keck" or a spacecraft
+            like "Juno".
+
+        Returns
+        -------
+        Longitude
+            The planetocentric longitude of the Sun.
+        """
+        et = spice.str2et(time.isot)
+        app_et = get_apparent_epoch(self._name, et, observer)
+        ls = Longitude(spice.lspcn(self._name, app_et, 'LT+S'), unit=u.rad)
+        return ls.to(u.degree)
 
     def get_latlon_sky_coordinates(self,
                                    time: Time,

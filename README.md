@@ -113,6 +113,37 @@ detailed below.
 > another time. As a Boulder mom's bumper sticker might say, "be the change you 
 > want to see in the world."
 
+### Small Bodies
+By default, the SPICE system does not contain most of the minor bodies in the
+Solar System, like comets and asteroids. However, you can get the necessary 
+SPICE data for them from JPL Horizons using the function `get_small_body`. For
+example, to get the ephemeris for the third interstellar object I3/Atlas
+(called C/2025 N1 officially) discovered during summer 2025, use the following: 
+```
+from planetviewer import get_small_body
+get_small_body('C/2025 N1')
+```
+
+You can now create a `SolarSystemObject` for C/2025 N1. You only need to call 
+this function once; once the ephemeris has been downloaded it will be available
+for all future uses of `planetviewer` within this virtual environment. However, 
+if the ephemeris has been updated since you last downloaded it, you can pass 
+the option `update=True`. You can also specify time ranges for which to 
+download the ephemeris data.
+
+> **CAUTION**<br>
+> Don't include parentheses in the names of small bodies. For instance, if you
+> look up "C/2025 N1" on the 
+> [Small-Body Database Lookup web app](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html),
+> the name will return as "C/2025 N1 (ATLAS)", however if you try to search 
+> using that name, it will tell you your search string contains one or more bad
+> characters. So just use "C/2025 N1" instead.
+
+Some small bodies will have multiple ephemerides, so if you specify the object
+by name or by NAIF ID number (the `spk_id` kwarg), the program may exit and 
+tell you that you need to specify a record number instead. Choose from those
+listed in the terminal output, pass that to `record_no` and try again.
+
 ### Ephemeris Calculation Methods
 The following table lists all of the ephemeris methods available in the 
 `SolarSystemBody` object. These should calculate all of the information (and 

@@ -3,12 +3,49 @@ import numpy as np
 import spiceypy as spice
 from spiceypy.utils.exceptions import NotFoundError
 
+__all__ = ['length_unit',
+           'time_unit',
+           'angle_unit',
+           'angle_rate_unit',
+           'abcorr',
+           'ref',
+           'subpoint_method',
+           'surface_method',
+           'corloc',
+           'refvec',
+           'determine_prograde_rotation',
+           'get_rotation_rate',
+           'get_radii',
+           'get_gravitational_parameter',
+           'get_equatorial_radius',
+           'get_flattening_coefficient',
+           'get_sky_coordinates',
+           'get_azel',
+           'get_light_time',
+           'get_apparent_epoch',
+           'get_target_frame',
+           'get_sub_observer_latlon',
+           'get_sub_observer_distance',
+           'get_sub_observer_epoch',
+           'get_sub_observer_phase_angle',
+           'get_sub_solar_latlon',
+           'get_sub_solar_distance',
+           'get_anti_solar_radec',
+           'get_state',
+           'get_limb_radec',
+           'get_terminator_radec',
+           'get_latlon_radec',
+           'determine_occultation',
+           'determine_if_in_shadow',
+           'get_dayside_radec',
+           'get_shadow_intercept',
+           ]
+
 # Set fundamental SPICE units for length, time and angle.
 length_unit = u.km
 time_unit = u.s
 angle_unit = u.rad
 angle_rate_unit = u.degree / u.day
-
 
 # Set common SPICE parameters
 abcorr = 'LT'
@@ -29,7 +66,7 @@ _planets = ['Mercury',
             'Pluto']
 
 
-def determine_prograde_rotation(target: str) -> bool:
+def determine_prograde_rotation(target: str) -> bool or None:
     """
     Determine if an object rotates prograde (most of the planets) or retrograde
     (Venus and Uranus).
@@ -46,11 +83,14 @@ def determine_prograde_rotation(target: str) -> bool:
         not.
     """
     code = spice.bodn2c(target)
-    pm = spice.bodvcd(code, 'PM', 3)[1]
-    if pm[1] < 0:
-        return False
-    else:
-        return True
+    try:  # exception handling for Horizons small body SPK files
+        pm = spice.bodvcd(code, 'PM', 3)[1]
+        if pm[1] < 0:
+            return False
+        else:
+            return True
+    except spice.utils.exceptions.SpiceKERNELVARNOTFOUND:
+        return None
 
 
 def get_rotation_rate(target: str) -> float:
@@ -84,6 +124,25 @@ def get_radii(target: str) -> np.ndarray:
     code = spice.bodn2c(target)
     _, radii = spice.bodvcd(code, 'RADII', 3)
     return radii
+
+
+def get_gravitational_parameter(target: str) -> float:
+    """
+    Get gravitational parameter (GM) for the target object.
+
+    Parameters
+    ----------
+    target : str
+        Name of target body.
+
+    Returns
+    -------
+    float
+        The gravitational parameter for the target in [km²/s³].
+    """
+    code = spice.bodn2c(target)
+    _, gm = spice.bodvcd(code, 'GM', 1)
+    return float(gm[0])
 
 
 def get_equatorial_radius(target: str,
@@ -133,9 +192,19 @@ def get_flattening_coefficient(target: str,
     return float((re - rp) / re)
 
 
+def get_local_solar_time(target: str,
+                         et: float,
+                         lon: float = 0.0) -> str:
+    code = spice.bodn2c(target)
+    _, _, _, time, _ = spice.et2lst(et, code, lon, 'PLANETOCENTRIC')
+    return time
+
+
 def get_sky_coordinates(target: str,
                         et: float,
-                        obs: str) -> tuple[float, float]:
+                        obs: str,
+                        reffrm: str = ref,
+                        aberr: str = abcorr) -> tuple[float, float]:
     """
     Get the RA and Dec of an object as viewed from a specified observatory at
     a given epoch.
@@ -148,13 +217,17 @@ def get_sky_coordinates(target: str,
         Observer epoch.
     obs : str
         Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
+    reffrm : str
+        Name of reference frame. Default is 'J2000'.
+    aberr : str
+        Type of abberation correction. Default is 'LT'.
 
     Returns
     -------
     tuple[float, float]
         The object RA and Dec in [rad].
     """
-    ptarg, _ = spice.spkpos(target, et, ref, abcorr, obs)
+    ptarg, _ = spice.spkpos(target, et, reffrm, aberr, obs)
     _, ra, dec = spice.recrad(ptarg)
     return ra, dec
 
@@ -178,7 +251,7 @@ def get_azel(target: str,
     Returns
     -------
     tuple[float, float]
-        The object azimuth and elecation in [rad]. Azimuth is measured
+        The object azimuth and elevation in [rad]. Azimuth is measured
         counterclockwise. Azimuth is measured relative to the horizon.
     """
     ptarg, _ = spice.spkpos(target, et, obs, abcorr, obs)
@@ -243,11 +316,11 @@ def get_apparent_epoch(target: str,
     return et_target
 
 
-def get_target_frame(target: str) -> str:
+def get_target_frame(target: str) -> str or None:
     """
     Get IAU target frame name except for Earth and the Moon, which return the
     high-precision ITRF93 and MEAN_ME frames.
-    
+
     Parameters
     ----------
     target : str
@@ -255,15 +328,14 @@ def get_target_frame(target: str) -> str:
 
     Returns
     -------
-    str
+    str or None
         The frame name as a string.
     """
-    if target == 'Earth':
-        return 'ITRF93'
-    elif target == 'Moon':
-        return 'MEAN_ME'
-    else:
-        return f'IAU_{target}'
+    try:  # exception handling for Horizons small body SPK files
+        _, frame = spice.cnmfrm(target)
+    except spice.utils.exceptions.NotFoundError:
+        frame = None
+    return frame
 
 
 def _get_subpnt(target: str,
@@ -300,6 +372,7 @@ def _get_subpnt(target: str,
     if desc == 'observer':
         return spice.subpnt(**kwargs)
     elif desc == 'solar':
+        kwargs['abcorr'] = 'LT+S'
         return spice.subslr(**kwargs)
     else:
         raise SystemExit("You have to choose between 'observer' and 'solar'!")
@@ -335,7 +408,7 @@ def _get_sub_latlon(target: str,
     lon = np.arctan2(spoint[1], spoint[0])
     re = get_equatorial_radius(target, lon)
     f = get_flattening_coefficient(target, lon)
-    lon, lat, _ = spice.recpgr(target, spoint, re, f)
+    lon, lat, _ = spice.recgeo(spoint, re, f)
     return lat, lon
 
 
@@ -732,7 +805,7 @@ def get_latlon_radec(target: str,
                   obsrvr=obs)
     re = get_equatorial_radius(target, longitude)
     f = get_flattening_coefficient(target, longitude)
-    spoint = spice.pgrrec(target, longitude, latitude, 0, re, f)
+    spoint = spice.georec(longitude, latitude, 0, re, f)
     trgepc, vec, _, _, _, visible, _ = spice.illumf(spoint=spoint, **params)
     if visible:
         rotation_matrix = spice.pxfrm2(get_target_frame(target), 'J2000',
@@ -917,7 +990,7 @@ def get_dayside_radec(target: str,
             rotation_matrix = spice.pxfrm2(get_target_frame(target),
                                               'J2000', trgepc, et)
             point = spice.mxv(rotation_matrix, srfvec)
-            point = spice.recrad(point)
+            point = np.array(spice.recrad(point))
             ra.append(point[1])
             dec.append(point[2])
 
@@ -961,12 +1034,12 @@ def get_shadow_intercept(target1: str,
     fixref1 = get_target_frame(target1)
     fixref2 = get_target_frame(target2)
     _, radii = spice.bodvrd(target1, 'RADII', 3)
-    
+
     # get apparent ephemeris times at target and Sun as viewed from target
     et_target = get_apparent_epoch(target1, et, obs, '<-')
     et_sun = get_apparent_epoch('Sun', et_target, target1, '<-')
 
-    # get vectors from Sun to parent's limb at much higher resolution to 
+    # get vectors from Sun to parent's limb at much higher resolution to
     # account for projected size differences
     hires = int(resolution * scale)
     params = dict(method='TANGENT/ELLIPSOID',
@@ -993,6 +1066,8 @@ def get_shadow_intercept(target1: str,
             indices.append(i)
         except NotFoundError:
             continue
+    if len(indices) == 0:
+        return np.array([]), np.array([])
     indices = np.concatenate(([indices[0] - 1], indices, [indices[-1] + 1]))
     indices %= tangts.shape[0]
 
@@ -1005,7 +1080,7 @@ def get_shadow_intercept(target1: str,
                 subpoint_method, target1, et_sun, fixref1, 'XLT', 'Sun',
                 fixref2, tangt)
             trgepc, srfvec, _, _, _, visibl, _ = spice.illumf(
-                'ELLIPSOID', target1, 'Sun', et, fixref1, abcorr, obs, spoint)
+                subpoint_method, target1, 'Sun', et, fixref1, abcorr, obs, spoint)
             if visibl:
                 rotation_matrix = spice.pxfrm2(fixref1, 'J2000', trgepc, et)
                 tpoint = spice.mxv(rotation_matrix, srfvec)
@@ -1014,14 +1089,14 @@ def get_shadow_intercept(target1: str,
                 dec.append(tpoint[2])
         except NotFoundError:
             _, alt, _, srfpt, trgepc, srfvec = spice.tangpt(
-                'ELLIPSOID', target1, et_sun, fixref1, 'XLT',
+                subpoint_method, target1, et_sun, fixref1, 'XLT',
                 'SURFACE POINT', 'Sun', fixref2, tangt)
             trgepc, srfvec, _, _, _, visibl, _ = spice.illumf(
-                'ELLIPSOID', target1, 'Sun', et, fixref1, abcorr, obs, srfpt)
+                subpoint_method, target1, 'Sun', et, fixref1, abcorr, obs, srfpt)
             rotation_matrix = spice.pxfrm2(fixref1, 'J2000', trgepc, et)
             tpoint = spice.mxv(rotation_matrix, srfvec)
             tpoint = spice.recrad(tpoint)
             ra.append(tpoint[1])
             dec.append(tpoint[2])
-            
+
     return np.flip(ra), np.flip(dec)

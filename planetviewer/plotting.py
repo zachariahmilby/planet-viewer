@@ -194,7 +194,7 @@ def _default_arc_kwargs() -> dict:
 def make_wcs(center: SkyCoord,
              fov: Angle,
              shape: tuple[int, int] = (3, 3),
-             scale: float = 1.000001) -> tuple[WCS, tuple[int, int]]:
+             scale: float = 1.0) -> tuple[WCS, tuple[int, int]]:
     """
     Convenience function for generating a WCS projection for plotting and
     coordinate transforms.
@@ -215,7 +215,7 @@ def make_wcs(center: SkyCoord,
     -------
     WCS
         The WCS for plotting and coordinate transforms.
-    tuple
+    tuple[int, int]
         The pixel dimensions of the field of view.
     """
     fov *= scale  # helps ensure the actual edge values are shown

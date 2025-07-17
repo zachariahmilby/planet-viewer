@@ -1,6 +1,7 @@
 from planetviewer.spice_kernels import (update_spice_kernels,
-                                        make_custom_observer)
+                                        get_small_body)
 from planetviewer.objects import SolarSystemBody, Ring, Arc, sort_by_distance
+from planetviewer.observing import ObservingSite
 from planetviewer.plotting import (make_wcs,
                                    set_standard_axis_limits,
                                    set_standard_axis_labels,

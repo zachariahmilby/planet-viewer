@@ -2,15 +2,10 @@ import matplotlib.pyplot as plt
 from astropy.coordinates import Angle
 from astropy.time import Time
 
-from planetviewer import (set_kernel_path,
-                          _furnish_spice_kernels,
-                          SolarSystemBody,
+from planetviewer import (SolarSystemBody,
                           make_wcs,
                           set_standard_axis_limits,
                           set_standard_axis_labels)
-
-set_kernel_path('/Users/zachariahmilby/SPICE')
-_furnish_spice_kernels()
 
 time = Time('2021-06-08 14:00')
 observer = 'Triton'
