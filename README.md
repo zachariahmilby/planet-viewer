@@ -183,7 +183,8 @@ arguments detailed in their docstrings.
 | `get_necessary_epoch`                      | Get the observer epoch necessary to observe the target at a given epoch.                                    |
 | `get_occultation`                          | Determine if this object is occulted by another object or vice-versa.                                       |
 | `get_eclipsed`                             | Determine if this body casts a shadow on another body or vice-versa.                                        |
-| `get_latlon_sky_coordinates`               | Get the apparent RA/Dec of a latitude/longitude point on the object's surface.                              |
+| `find_eclipses`                            | Find when object is eclipse (in the shadow) of another body for a given time range.                         |
+| `get_latlonalt_sky_coordinates`            | Get the apparent RA/Dec of a latitude/longitude point at a given altitude above the object's surface.       |
 | `get_longitude_line_coordinates`           | Get the apparent RA/Dec of an entire meridian.                                                              |
 | `get_latitude_line_coordinates`            | Get the apparent RA/Dec of an entire parallel.                                                              |
 | `get_limb_sky_coordinates`                 | Get the apparent RA/Dec of an object's limb.                                                                |

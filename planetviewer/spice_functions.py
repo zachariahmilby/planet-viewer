@@ -34,9 +34,11 @@ __all__ = ['length_unit',
            'get_state',
            'get_limb_radec',
            'get_terminator_radec',
-           'get_latlon_radec',
+           'get_latlonalt_radec',
            'determine_occultation',
            'determine_if_in_shadow',
+           'find_when_target_occulted',
+           'find_when_target_eclipsed',
            'get_dayside_radec',
            'get_shadow_intercept',
            ]
@@ -195,6 +197,23 @@ def get_flattening_coefficient(target: str,
 def get_local_solar_time(target: str,
                          et: float,
                          lon: float = 0.0) -> str:
+    """
+    Get local solar time at a given longitude on a target body.
+
+    Parameters
+    ----------
+    target : str
+        Name of target body.
+    et : float
+        Observer epoch.
+    lon : float
+        Planetographic longitude of target body.
+
+    Returns
+    -------
+    str
+        Local solar time (hour angle of the Sun).
+    """
     code = spice.bodn2c(target)
     _, _, _, time, _ = spice.et2lst(et, code, lon, 'PLANETOCENTRIC')
     return time
@@ -338,10 +357,11 @@ def get_target_frame(target: str) -> str or None:
     return frame
 
 
-def _get_subpnt(target: str,
+def _get_subpnt(func: callable,
+                target: str,
                 et: float,
                 obs: str,
-                desc: str) -> tuple[np.ndarray, float, np.ndarray]:
+                aberr: str = abcorr) -> tuple[np.ndarray, float, np.ndarray]:
     """
     Wrapper function to get either sub-solar or sub-observer points.
 
@@ -353,9 +373,8 @@ def _get_subpnt(target: str,
         Observer epoch.
     obs : str
         Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
-    desc: str
-        Whether you want 'observer' for sub-observer coordinates or 'solar' for
-        sub-solar coordinates.
+    aberr : str
+        Aberration correction flag. Default is 'LT'.
 
     Returns
     -------
@@ -367,21 +386,16 @@ def _get_subpnt(target: str,
                   target=target,
                   et=et,
                   fixref=get_target_frame(target),
-                  abcorr=abcorr,
+                  abcorr=aberr,
                   obsrvr=obs)
-    if desc == 'observer':
-        return spice.subpnt(**kwargs)
-    elif desc == 'solar':
-        kwargs['abcorr'] = 'LT+S'
-        return spice.subslr(**kwargs)
-    else:
-        raise SystemExit("You have to choose between 'observer' and 'solar'!")
+    return func(**kwargs)
 
 
-def _get_sub_latlon(target: str,
+def _get_sub_latlon(func: callable,
+                    target: str,
                     et: float,
                     obs: str,
-                    desc: str) -> tuple[float, float]:
+                    aberr: str = abcorr) -> tuple[float, float]:
     """
     Get sub-observer or sub-solar geodetic latitude and east longitude on the
     target body.
@@ -394,9 +408,8 @@ def _get_sub_latlon(target: str,
         Observer epoch.
     obs : str
         Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
-    desc: str
-        Whether you want 'observer' for sub-observer coordinates or 'solar' for
-        sub-solar coordinates.
+    aberr : str
+        Aberration correction flag. Default is 'LT'.
 
     Returns
     -------
@@ -404,7 +417,7 @@ def _get_sub_latlon(target: str,
         The sub-observer or sub-solar latitude and longitude on the target body
         in [rad].
     """
-    spoint, _, _ = _get_subpnt(target, et, obs, desc)
+    spoint, _, _ = _get_subpnt(func, target, et, obs, aberr)
     lon = np.arctan2(spoint[1], spoint[0])
     re = get_equatorial_radius(target, lon)
     f = get_flattening_coefficient(target, lon)
@@ -412,10 +425,11 @@ def _get_sub_latlon(target: str,
     return lat, lon
 
 
-def _get_sub_distance(target: str,
+def _get_sub_distance(func: callable,
+                      target: str,
                       et: float,
                       obs: str,
-                      desc: str) -> float:
+                      aberr: str = abcorr) -> float:
     """
     Get distance to the sub-observer point or sub-solar point on target body.
 
@@ -427,9 +441,8 @@ def _get_sub_distance(target: str,
         Observer epoch.
     obs : str
         Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
-    desc: str
-        Whether you want 'observer' for sub-observer coordinates or 'solar' for
-        sub-solar coordinates.
+    aberr : str
+        Aberration correction flag. Default is 'LT'.
 
     Returns
     -------
@@ -437,7 +450,7 @@ def _get_sub_distance(target: str,
         The distance to the sub-observer point or sub-solar point on target
         body in [km].
     """
-    _, _, srfvec = _get_subpnt(target, et, obs, desc)
+    _, _, srfvec = _get_subpnt(func, target, et, obs, aberr)
     return spice.vnorm(srfvec)
 
 
@@ -462,7 +475,7 @@ def get_sub_observer_latlon(target: str,
     tuple[float, float]
         The sub-solar latitude and longitude on the target body in [rad].
     """
-    return _get_sub_latlon(target, et, obs, 'observer')
+    return _get_sub_latlon(spice.subpnt, target, et, obs)
 
 
 def get_sub_observer_distance(target: str,
@@ -486,7 +499,7 @@ def get_sub_observer_distance(target: str,
         The distance between the observer and the sub-observer point on the
         target body's surface in [km].
     """
-    return _get_sub_distance(target, et, obs, 'observer')
+    return _get_sub_distance(spice.subpnt, target, et, obs)
 
 
 def get_sub_observer_epoch(target: str,
@@ -510,7 +523,7 @@ def get_sub_observer_epoch(target: str,
         The apparent time at the sub-observer point (effectively the epoch with
         the light travel time to the sub-observer point subtracted).
     """
-    _, trgepc, _ = _get_subpnt(target, et, obs, 'observer')
+    _, trgepc, _ = _get_subpnt(spice.subpnt, target, et, obs)
     return trgepc
 
 
@@ -534,7 +547,7 @@ def get_sub_observer_phase_angle(target: str,
     float
         The phase angle at the sub-observer point in [rad].
     """
-    spoint, _, _ = _get_subpnt(target, et, obs, 'observer')
+    spoint, _, _ = _get_subpnt(spice.subpnt, target, et, obs)
     _, _, phase, _, _ = spice.ilumin(
         subpoint_method, target, et, get_target_frame(target), abcorr, obs,
         spoint)
@@ -562,7 +575,7 @@ def get_sub_solar_latlon(target: str,
     tuple[float, float]
         The sub-solar latitude and longitude on the target body in [rad].
     """
-    return _get_sub_latlon(target, et, obs, 'solar')
+    return _get_sub_latlon(spice.subslr, target, et, obs, 'LT+S')
 
 
 def get_sub_solar_distance(target: str,
@@ -586,7 +599,7 @@ def get_sub_solar_distance(target: str,
         The distance between the observer and the sub-solar point on the target
         body's surface in [km].
     """
-    return _get_sub_distance(target, et, obs, 'solar')
+    return _get_sub_distance(spice.subslr, target, et, obs, 'LT+S')
 
 
 def get_anti_solar_radec(et: float,
@@ -767,14 +780,15 @@ def get_terminator_radec(target: str,
     return ra, dec
 
 
-def get_latlon_radec(target: str,
-                     et: float,
-                     obs: str,
-                     latitude: float,
-                     longitude: float) -> tuple[float, float]:
+def get_latlonalt_radec(target: str,
+                        et: float,
+                        obs: str,
+                        latitude: float,
+                        longitude: float,
+                        altitude: float = 0.0) -> tuple[float, float]:
     """
-    Get the J2000 right ascension and declination of the target body's apparent
-    limb for a given observer.
+    Get the J2000 right ascension and declination of a coordinate on or above
+    the reference body sphereoid.
 
     Parameters
     ----------
@@ -788,6 +802,8 @@ def get_latlon_radec(target: str,
         Planetodetic longitude on the target body in units of [rad].
     longitude : float
         Planetodetic latitude on the target body in units of [rad].
+    altitude : float
+        Altitude above the target body reference sphereoid in units of [km].
 
     Returns
     -------
@@ -805,15 +821,25 @@ def get_latlon_radec(target: str,
                   obsrvr=obs)
     re = get_equatorial_radius(target, longitude)
     f = get_flattening_coefficient(target, longitude)
-    spoint = spice.georec(longitude, latitude, 0, re, f)
-    trgepc, vec, _, _, _, visible, _ = spice.illumf(spoint=spoint, **params)
-    if visible:
-        rotation_matrix = spice.pxfrm2(get_target_frame(target), 'J2000',
-                                       trgepc, et)
-        point = spice.mxv(rotation_matrix, vec)
-        _, ra, dec = spice.recrad(point)
+    spoint = spice.georec(longitude, latitude, altitude, re, f)
+    starg, _ = spice.spkezr(target, et, ref, abcorr, obs)
+    object_distance = spice.vnorm(starg)
+
+    trgepc, vec, _, _, _, _, _ = spice.illumf(spoint=spoint, **params)
+    rotation_matrix = spice.pxfrm2(get_target_frame(target), 'J2000',
+                                   trgepc, et)
+    point = spice.mxv(rotation_matrix, vec)
+    point_distance = spice.vnorm(point)
+    if point_distance > object_distance:
+        try:
+            spice.sincpt('ELLIPSOID', target, et, get_target_frame(target),
+                         abcorr, obs, 'J2000', point)
+        except NotFoundError:
+            _, ra, dec = spice.recrad(point)
+        else:
+            ra, dec = np.nan, np.nan
     else:
-        ra, dec = np.nan, np.nan
+        _, ra, dec = spice.recrad(point)
     return ra, dec
 
 
@@ -913,6 +939,99 @@ def determine_if_in_shadow(target1: str,
 
     # get occultation code with Sun as the observer
     return determine_occultation(target1, target2, et_sun, 'Sun', 'XLT')
+
+
+def find_when_target_occulted(front: str,
+                              back: str,
+                              occtyp: str,
+                              et_start: float,
+                              et_end: float,
+                              obsrvr: str,
+                              step: int = 60) -> spice.SpiceCell:
+    """
+    Find when a target is occulted by another within a given time range.
+
+    Parameters
+    ----------
+    front : str
+        Name of body occulting the other.
+    back : str
+        Name of body occulted by the other.
+    occtyp : str
+        Type of occultation, options are 'full', 'partial', 'annular' or 'all'.
+    et_start : float
+        Ephemeris time for start of search window.
+    et_end : float
+        Ephemeris time for end of search window.
+    obsrvr : str
+        Name of observing body, e.g., 'Earth' or 'Keck' or 'JWST'.
+    step : int
+        Step size in seconds for finding occultation events. Default is 60
+        seconds (1 minute), but can be made larger or smaller (which will
+        change calculation time).
+
+    Returns
+    -------
+    spice.SpiceCell
+        A `SpiceCell` containing the boundaries of the occultation(s).
+    """
+    cnfine = spice.stypes.SPICEDOUBLE_CELL(2)
+    spice.wninsd(et_start, et_end, cnfine)
+    result = spice.gfoclt(occtyp=occtyp,
+                          front=front,
+                          fshape='ELLIPSOID',
+                          fframe=get_target_frame(front),
+                          back=back,
+                          bshape='ELLIPSOID',
+                          bframe=get_target_frame(back),
+                          abcorr='LT',
+                          obsrvr=obsrvr,
+                          step=step,
+                          cnfine=cnfine)
+    return result
+
+
+def find_when_target_eclipsed(front: str,
+                              back: str,
+                              occtyp: str,
+                              et_start: float,
+                              et_end: float,
+                              step: int = 60) -> spice.SpiceCell:
+    """
+    Find when a target passes into the shadow of another within a given time
+    range.
+
+    Parameters
+    ----------
+    front : str
+        Name of body occulting the other.
+    back : str
+        Name of body occulted by the other.
+    occtyp : str
+        Type of occultation, options are 'full', 'partial', 'annular' or 'all'.
+    et_start : float
+        Ephemeris time for start of search window.
+    et_end : float
+        Ephemeris time for end of search window.
+    step : int
+        Step size in seconds for finding occultation events. Default is 60
+        seconds (1 minute), but can be made larger or smaller (which will
+        change calculation time).
+
+    Returns
+    -------
+    spice.SpiceCell
+        A `SpiceCell` containing the boundaries of the eclipse(s).
+    """
+    result = find_when_target_occulted(front=front,
+                                       back=back,
+                                       occtyp=occtyp,
+                                       et_start=et_start,
+                                       et_end=et_end,
+                                       obsrvr='Sun',
+                                       step=step)
+
+    return result
 
 
 def get_dayside_radec(target: str,

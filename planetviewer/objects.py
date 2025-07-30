@@ -16,6 +16,7 @@ from planetviewer.plotting import (
     plot_limb, plot_disk, plot_nightside, plot_latlon, plot_ring, plot_arc,
     place_ring_pericenter_markers, _default_night_patch_kwargs)
 from planetviewer.spice_functions import *
+from planetviewer.spice_functions import find_when_target_eclipsed
 from planetviewer.spice_kernels import _furnish_kernels_if_not_in_pool
 
 
@@ -1114,7 +1115,7 @@ class SolarSystemBody:
         if refcoord is None:
             return Angle('0d').to(u.arcsec), Angle('0d').to(u.arcsec)
         coord = self.get_skycoord(time, observer)
-        offset = refcoord.spherical_offsets_to(coord)
+        offset = coord.spherical_offsets_to(refcoord)
         return offset[0].to(u.arcsec), offset[1].to(u.arcsec)
 
     def get_radec_rates(self,
@@ -1867,6 +1868,47 @@ class SolarSystemBody:
         et = spice.str2et(time.isot)
         return determine_if_in_shadow(self._name, other_body_name, et, observer)
 
+    def find_eclipses(self,
+                      eclipse_type: str,
+                      other_body_name: str,
+                      window_start: Time,
+                      window_end: Time) -> list[list[Time]]:
+        """
+        Find when this body is eclipsed by another body (is within its shadow)
+        within a given time window.
+
+        Parameters
+        ----------
+        eclipse_type : str
+            The type of eclipse to find. Options are 'full', 'partial',
+            'annular' or 'any'.
+        other_body_name : str
+            The name of the shadow-casting body.
+        window_start : Time
+            The start of the time window in which to search for eclipses.
+        window_end : Time
+            The end of the time window in which to search for eclipses.
+
+        Returns
+        -------
+        list[list[Time]]
+            A list containing eclipse boundaries within the time window. The
+            list has a shape (n, 2) where the first axis is the "n" number of
+            eclipses found and the second axis is the start and end times of
+            the eclipse as Astropy `Time` objects.
+        """
+        et_start = spice.str2et(window_start.isot)
+        et_end = spice.str2et(window_end.isot)
+        eclipses = find_when_target_eclipsed(other_body_name, self._name,
+                                             eclipse_type, et_start, et_end)
+        pictur = 'YYYY-MM-DDTHR:MN:SC ::UTC'
+        boundaries = []
+        for i in range(spice.wncard(eclipses)):
+            t0 = Time(spice.timout(spice.wnfetd(eclipses, i)[0], pictur))
+            t1 = Time(spice.timout(spice.wnfetd(eclipses, i)[1], pictur))
+            boundaries.append([t0, t1])
+        return boundaries
+
     def get_solar_longitude(self,
                             time: Time,
                             observer: str) -> Longitude:
@@ -1893,14 +1935,17 @@ class SolarSystemBody:
         ls = Longitude(spice.lspcn(self._name, app_et, 'LT+S'), unit=u.rad)
         return ls.to(u.degree)
 
-    def get_latlon_sky_coordinates(self,
-                                   time: Time,
-                                   observer: str,
-                                   latitude: u.Quantity,
-                                   longitude: u.Quantity) -> SkyCoord:
+    def get_latlonalt_sky_coordinates(self,
+                                      time: Time,
+                                      observer: str,
+                                      latitude: u.Quantity,
+                                      longitude: u.Quantity,
+                                      altitude: u.Quantity = 0 * u.km
+                                      ) -> SkyCoord:
         """
         Get the right ascension and declination of of a latitude/longitude
-        point on the body's surface for a given observer and observation time.
+        point on the body's surface (or at a given altitude above the surface)
+        for a given observer and observation time.
 
         Parameters
         ----------
@@ -1914,6 +1959,8 @@ class SolarSystemBody:
             A latitude.
         longitude : u.Quantity
             A longitude.
+        altitude : u.Quantity, optional
+            An altitude. Default is 0 km.
 
         Returns
         -------
@@ -1924,8 +1971,9 @@ class SolarSystemBody:
         et = spice.str2et(time.isot)
         latitude = latitude.to(u.rad).value
         longitude = longitude.to(u.rad).value
-        ra, dec = get_latlon_radec(
-            self._name, et, observer, latitude, longitude)
+        altitude = altitude.to(u.km).value
+        ra, dec = get_latlonalt_radec(
+            self._name, et, observer, latitude, longitude, altitude)
         return SkyCoord(ra=Angle(ra * angle_unit), dec=Angle(dec * angle_unit))
 
     def get_longitude_line_coordinates(self,
@@ -1959,9 +2007,14 @@ class SolarSystemBody:
         """
         latitudes = np.linspace(-90, 90, int(180 / dlat.value) + 1) * u.degree
         coords = []
+        altitude = 0 * u.km
         for latitude in latitudes:
-            coords.append(self.get_latlon_sky_coordinates(time, observer,
-                                                          latitude, longitude))
+            kwargs = dict(time=time,
+                          observer=observer,
+                          latitude=latitude,
+                          longitude=longitude,
+                          altitude=altitude)
+            coords.append(self.get_latlonalt_sky_coordinates(**kwargs))
         return coords
 
     def get_latitude_line_coordinates(self,
@@ -1996,9 +2049,14 @@ class SolarSystemBody:
         longitudes = np.linspace(-180, 180,
                                  int(360 / dlon.value) + 1) * u.degree
         coords = []
+        altitude = 0 * u.km
         for longitude in longitudes:
-            coords.append(self.get_latlon_sky_coordinates(time, observer,
-                                                          latitude, longitude))
+            kwargs = dict(time=time,
+                          observer=observer,
+                          latitude=latitude,
+                          longitude=longitude,
+                          altitude=altitude)
+            coords.append(self.get_latlonalt_sky_coordinates(**kwargs))
         return coords
 
     def get_limb_sky_coordinates(self,
@@ -2530,7 +2588,7 @@ class SolarSystemBody:
                     coord, distance = (
                         self._get_ring_pericenters(ring, time, observer))
                     place_ring_pericenter_markers(axis, coord, distance,
-                                                  body_distance, side, dra,
+                                                  body_distance.value, side, dra,
                                                   ddec, **kwargs)
 
     def draw(self,

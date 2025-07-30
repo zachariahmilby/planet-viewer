@@ -75,7 +75,7 @@ class _SPICEKernel:
         ----------
         name : str
             The name of the kernel.
-        local_path : str
+        local_path : str or Path
             The local path of the kernel.
         remote_path : str or None
             The remote path of the kernel.
@@ -317,7 +317,7 @@ class _EarthObservatory:
 
     # noinspection DuplicatedCode
     def make_spk_kernel(self,
-                        overwrite: bool = False) -> [_SPICEKernel]:
+                        overwrite: bool = False) -> list[_SPICEKernel]:
         """
         Generate a SPICEKernel object for this observatory's SPK kernel.
 
@@ -384,7 +384,7 @@ class _EarthObservatory:
 
     # noinspection DuplicatedCode
     def make_tk_kernel(self,
-                        overwrite: bool = False) -> [_SPICEKernel]:
+                        overwrite: bool = False) -> list[_SPICEKernel]:
         """
         Generate a SPICEKernel object for this observatory's SPK kernel.
 
@@ -662,6 +662,8 @@ def _furnish_all_kernels() -> None:
 
 def _furnish_kernels_if_not_in_pool():
     count = spice.ktotal('ALL')
+    if not kernel_path.exists():
+        _download_spice_kernels()
     if count == 0:
         _furnish_all_kernels()
     else:
